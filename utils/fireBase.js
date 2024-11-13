@@ -2,11 +2,10 @@ const admin = require('firebase-admin');
 const dotenv = require("dotenv")
 dotenv.config()
  
- const FIREBASE_SERVICE_ACCOUNT_KEY = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 
-  
 admin.initializeApp({
-  credential: admin.credential.cert(FIREBASE_SERVICE_ACCOUNT_KEY ),
+  credential: admin.credential.cert(serviceAccount),
   storageBucket: 'fir-project-8d315.appspot.com' // Specify your bucket name
 });
 
@@ -62,11 +61,6 @@ const uploadFileToFirebase = async (files) => {
     // Ensure files is an array to handle both single and multiple uploads
     files = Array.isArray(files) ? files : [files]; // Wrap in array if it's a single file object
   
-    if (files.length === 0) {
-        console.warn('No files provided for upload');
-        return fileUrls;
-    }
-
     try {
         for (const file of files) {
             const docId = Math.floor(Math.random() * 900000000) + 100000000;
@@ -89,7 +83,7 @@ const uploadFileToFirebase = async (files) => {
                         fileUrls.push(fileUrl);
                         resolve();
                     } catch (error) {
-                        reject(new Error(`Error generating signed URL: ${error.message}`));
+                        reject(error);
                     }
                 });
   
