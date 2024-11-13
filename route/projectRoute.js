@@ -114,7 +114,9 @@ route.post("/post", auth, upload.array('file'), async (req, res) => {
     if (req.files && req.files.length > 0) {
       const newFileUrls = await uploadFileToFirebase(req.files);
       fileUrls = [...fileUrls, ...newFileUrls];
-    }
+    }else {
+      console.warn("No files received for upload.");
+  }
 
     const newProject = new Project({
       ...req.body,
