@@ -5,11 +5,7 @@ dotenv.config();
 const auth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   
-  // // Check for Authorization header and ensure it starts with "Bearer"
-  // if (!authHeader || !authHeader.startsWith('Bearer ')) {
-  //   return res.status(401).json({ message: "Access token missing or malformed." });
-  // }
-
+ 
   const token = authHeader.split(' ')[1]; // Extract token
   
   try {

@@ -127,7 +127,7 @@ route.post("/post", auth, upload.array('file'), async (req, res) => {
     return res.status(200).send({ message: 'Project created successfully', project: savedProject });
 
   } catch (error) {
-    console.error('Error adding files to project:', error);
+    console.error('Error adding files to project:', error.message);
     return res.status(500).send({ message: `Internal server error: ${error.message}` });
   }
 });

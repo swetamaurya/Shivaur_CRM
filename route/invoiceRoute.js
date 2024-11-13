@@ -77,7 +77,7 @@ route.post('/estimates/post',auth, async (req, res) => {
     try {
         const estimate = new Estimate(req.body);
         await estimate.save();
-        res.status(201).json({
+        res.status(200).json({
             message: 'Estimate created successfully',
             estimate,
         });
@@ -96,6 +96,27 @@ route.get('/estimates/get',auth, async (req, res) => {
         res.status(500).json({ message: 'Error fetching estimates', error: error.message });
     }
 });
+
+
+route.get('/estimates/get/:_id', auth, async (req, res) => {
+    try {
+        const { _id } = req.params; // Access _id from req.query
+        if (!_id) {
+            return res.status(400).json({ message: 'Estimate ID (_id) is required' });
+        }
+
+        const estimate = await Estimate.findById(_id);
+        
+        if (!estimate) {
+            return res.status(404).json({ message: 'Estimate not found' });
+        }
+
+        res.status(200).json(estimate);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching estimate', error: error.message });
+    }
+});
+
 
 
 // Update an estimate by ID

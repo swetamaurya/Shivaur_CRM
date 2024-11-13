@@ -1,8 +1,7 @@
 const express = require('express');
 const { auth } = require('../Middleware/authorization');
-const { Holiday, Leaves ,LeavesType } = require('../model/holidayModel');
-const { User } = require('../model/userModel');
-const route = express.Router();
+const { Holiday, Leaves ,LeaveType } = require('../model/holidayModel');
+ const route = express.Router();
 
 // Holiday CRUD Operations
 
@@ -70,10 +69,12 @@ route.post('/leaves/post', auth, async (req, res) => {
     try {
         const addLeave = new Leaves({
             ...req.body,
-            employee: req.user._id, // Associate leave request with the logged-in user
+            employee: req.user.id, // Associate leave request with the logged-in user
             approvedBy: null, // Approval will be set later
         });
         await addLeave.save();
+        console.log(addLeave)
+
         res.status(200).send(addLeave);
     } catch (error) {
         console.error('Error creating leave:', error.message);
@@ -82,41 +83,47 @@ route.post('/leaves/post', auth, async (req, res) => {
 });
 
 
-// Route to get all leaves (Admins get all, others get their own only)
 route.get('/leaves/get', auth, async (req, res) => {
     try {
-        const { roles, _id: userId } = req.user;
-        const query = roles === 'Admin' ? {} : { employee: userId };
+        const { roles, id: userId } = req.user;
+        console.log("req.user:", req.user);
 
+        // Define the query based on role
+        let query = {};
+        if (roles === "Employee") {
+            // For Employees, filter by their own userId (as a string)
+            query = { employee: userId };
+            console.log(query)
+        }
+
+        // Fetch the leaves based on the query
         const leaves = await Leaves.find(query)
-            .populate('employee', 'name email userId')
-            .populate('approvedBy', 'name email userId')
-            .sort({ _id: -1 });
+            .populate('employee', 'name email')
+            .populate('approvedBy', 'name email')
+            .populate('leaveType', 'leaveName')
+            .sort({ createdAt: -1 }); // Sorting by created date (most recent first)
 
-        // Filter and count each leave type
-        const medicalLeaveCount = leaves.filter(leave => leave.leaveType === "Medical Leave").length;
-        const LOPCount = leaves.filter(leave => leave.leaveType === "Loss Of Pay").length;
-        const paidLeaveCount = leaves.filter(leave => leave.leaveType === "Paid Leave").length;
-        const casualLeaveCount = leaves.filter(leave => leave.leaveType === "Casual Leave").length;
-        const otherLeaveCount = leaves.filter(leave => leave.leaveType === "Other").length;
+        console.log("Fetched Leaves:", leaves); // Log the fetched leaves
 
-        // Calculate uncategorized leaves if no specific leave types are present
-        const uncategorizedCount = (medicalLeaveCount === 0 && LOPCount === 0 && paidLeaveCount === 0 && casualLeaveCount === 0 && otherLeaveCount === 0)
-            ? leaves.length  // If no specific leave types exist, all are categorized as "Uncategorized"
-            : leaves.filter(leave => !["Medical Leave", "Loss Of Pay", "Paid Leave", "Casual Leave", "Other"].includes(leave.leaveType)).length;
+        // Calculate leave summary
+        const totalLeavesTaken = leaves.reduce((sum, leave) => sum + Number(leave.leavesTaken || 0), 0);
+        const totalPendingRequests = leaves.filter(leave => leave.leaveStatus === 'Pending').length;
+        const totalApprovedLeaves = leaves.filter(leave => leave.leaveStatus === 'Approved').length;
+        const totalRejectedLeaves = leaves.filter(leave => leave.leaveStatus === 'Rejected').length;
 
-        // Calculate combined count of otherLeaveCount and uncategorizedCount
-        const totalOtherAndUncategorizedCount = otherLeaveCount + uncategorizedCount;
+        const totalAvailableLeaves = leaves.length > 0 ? Number(leaves[0].totalLeaves) : 0;
+        const totalRemainingLeaves = totalAvailableLeaves - totalLeavesTaken;
 
         res.status(200).json({
-            medicalLeaveCount,
-            LOPCount,
-            paidLeaveCount,
-            casualLeaveCount,
-            otherLeaveCount,
-            uncategorizedCount,
-            totalOtherAndUncategorizedCount,
-            leaves,
+            summary: {
+                totalLeavesTaken,
+                totalPendingRequests,
+                totalApprovedLeaves,
+                totalRejectedLeaves,
+                totalAvailableLeaves,
+                totalRemainingLeaves,
+            },
+            leaves
         });
     } catch (error) {
         console.error('Error fetching leaves:', error.message);
@@ -127,18 +134,20 @@ route.get('/leaves/get', auth, async (req, res) => {
 
 
 
+
 // Route to get a specific leave request by ID
 route.get('/leaves/get/:id', auth, async (req, res) => {
     try {
-        const leave = await Leaves.findById(req.params.id)
+        const {id} = req.params
+        console.log(req.params)
+         const leave = await Leaves.findById(id)
             .populate('employee', 'name email userId')
-            .populate('approvedBy', 'name email userId');
+            .populate('approvedBy', 'name email userId')
+            .populate('leaveType', 'leaveName');
 
         if (!leave) return res.status(404).json({ error: 'Leave not found' });
 
-        if (req.user.roles !== 'Admin' && leave.employee._id.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Access denied: Unauthorized to view this leave request.' });
-        }
+      
 
         res.status(200).json(leave);
     } catch (error) {
@@ -147,6 +156,7 @@ route.get('/leaves/get/:id', auth, async (req, res) => {
     }
 });
 
+
 // Route to update a leave request (Admins only or employee updating their own leave)
 route.post('/leaves/update', auth, async (req, res) => {
     const { _id } = req.body;
@@ -154,9 +164,7 @@ route.post('/leaves/update', auth, async (req, res) => {
         const leave = await Leaves.findById(_id);
         if (!leave) return res.status(404).json({ error: 'Leave not found' });
 
-        if (req.user.roles !== 'Admin' && leave.employee.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Access denied: Unauthorized to update this leave.' });
-        }
+      
 
         const updatedLeave = await Leaves.findByIdAndUpdate(_id, req.body, { new: true });
         res.status(200).send(updatedLeave);
@@ -166,24 +174,7 @@ route.post('/leaves/update', auth, async (req, res) => {
     }
 });
 
-// Route to delete a leave (Admins only or employee deleting their own leave)
-route.post("/leaves/delete", auth, async (req, res) => {
-    const { _id } = req.body;
-    try {
-        const leave = await Leaves.findById(_id);
-        if (!leave) return res.status(404).json({ error: 'Leave not found' });
-
-        if (req.user.roles !== 'Admin' && leave.employee.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Access denied: Unauthorized to delete this leave.' });
-        }
-
-        await leave.deleteOne();
-        res.status(200).send({ message: 'Leave deleted successfully.' });
-    } catch (error) {
-        console.error("Error deleting leave:", error);
-        return res.status(500).send(`Internal server error: ${error.message}`);
-    }
-});
+ 
 
 // Route to approve or decline a leave request (Admins only)
 route.post('/leaves/approve', auth, async (req, res) => {
@@ -220,10 +211,15 @@ route.post('/leaves/approve', auth, async (req, res) => {
 ///////////////////////////// Leave type /////////////////////
 route.post('/leavesType/post', auth, async (req, res) => {
     try {
-        const addLeave = new LeavesType({
-            ...req.body,
-         });
+        const{leaveName,durationLeave,day} =req.body
+
+        const addLeave = new LeaveType({
+            leaveName,durationLeave,day
+
+    });
+     
         await addLeave.save();
+        console.log("addLeave",addLeave)
         res.status(200).send(addLeave);
     } catch (error) {
         console.error('Error creating leave:', error.message);
@@ -234,7 +230,20 @@ route.post('/leavesType/post', auth, async (req, res) => {
 
 route.get('/leavesType/get', auth, async (req, res) => {
     try {
-        const leaves = await LeavesType.find()
+        const leaves = await LeaveType.find().sort({_id :-1})
+
+        res.status(200).send(leaves);
+    } catch (error) {
+        console.error('Error creating leave:', error.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+route.get('/leavesType/get/id', auth, async (req, res) => {
+    try {
+        const {id} = req.params
+        console.log("leave type",req.params)
+         const leaves = await LeaveType.findById(id)
 
         res.status(200).send(leaves);
     } catch (error) {
@@ -246,7 +255,7 @@ route.get('/leavesType/get', auth, async (req, res) => {
  route.post('/leavesType/update', auth, async (req, res) => {
     const { _id } = req.body;
     try {
-        const leave = await LeavesType.findById(_id);
+        const leave = await LeaveType.findById(_id);
         if (!leave) return res.status(404).json({ error: 'Leave not found' });
 
         if (req.user.roles !== 'Admin' && leave.employee.toString() !== req.user._id.toString()) {
@@ -262,22 +271,5 @@ route.get('/leavesType/get', auth, async (req, res) => {
 });
 
 
-route.post("/leavesType/delete", auth, async (req, res) => {
-    const { _id } = req.body;
-    try {
-        const leave = await LeavesType.findById(_id);
-        if (!leave) return res.status(404).json({ error: 'Leave not found' });
-
-        if (req.user.roles !== 'Admin' && leave.employee.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Access denied: Unauthorized to delete this leave.' });
-        }
-
-        await leave.deleteOne();
-        res.status(200).send({ message: 'Leave deleted successfully.' });
-    } catch (error) {
-        console.error("Error deleting leave:", error);
-        return res.status(500).send(`Internal server error: ${error.message}`);
-    }
-});
-
+ 
 module.exports = route;

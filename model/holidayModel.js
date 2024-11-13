@@ -1,45 +1,52 @@
 const mongoose = require('mongoose');
-// const moment = require('moment');
+const moment = require('moment');
 
+// Holiday Schema
 const holidaySchema = new mongoose.Schema({
-    holidayName: { type: String },
-    holidayDate: { type: String },
-    offDays: { type: String },
+    holidayName: { type: String, required: true },
+    holidayDate: { type: String, required: true },
+    offDays: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
+
+// Leave Type Schema
 const leaveTypeSchema = new mongoose.Schema({
-    leaveName: { type: String },
-    day : { type: String },
-    durationLeave: { type: String },
+    leaveName: { type: String, required: true },
+    day: { type: String, required: true },
+    durationLeave: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
-const LeavesSchema = new mongoose.Schema({
+const LeaveType = mongoose.model('LeaveType', leaveTypeSchema); // Changed model name for consistency
+
+// Leaves Schema
+const leavesSchema = new mongoose.Schema({
     leaveId: { type: String },
-    todayPresents: { type: String ,default: 0},
-    plannedLeaves: { type: String ,default: 0},
-    unplannedLeaves: { type: String ,default: 0},
-    pendingRequests: { type: String ,default: 0},
-    leaveType: {  type: mongoose.Schema.Types.ObjectId, ref: 'LeavesType' },
+    todayPresents: { type: String, default: "0" },
+    plannedLeaves: { type: String, default: "0" },
+    unplannedLeaves: { type: String, default: "0" },
+    pendingRequests: { type: String, default: "0" },
+    leaveType: { type: mongoose.Schema.Types.ObjectId, ref: 'LeaveType' },
     daysLeaveType: { type: String },
-    leaveStatus: { type: String , default : 'Pending' },
+    leaveStatus: { type: String, default: 'Pending' },
     from: { type: String },
     to: { type: String },
     halfDay: {
         type: String,
-        enum: ['First Half', 'Second Half'],  
-        default: null  } ,
-    employee: {  type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    totalLeaves: { type: String ,default: 0},
-    leavesTaken: { type: String ,default: 0},
-    leavesAbsent: { type: String ,default: 0},
-    pendingAppproval : { type: String },
-    workingDays: { type: String ,default: 0},
-    approvedBy: {  type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    noOfDays: { type: String ,default: 0},
-    reamaingLeave: { type: String },
+        enum: ['First Half', 'Second Half'],
+        default: null
+    },
+    employee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    totalLeaves: { type: String, default: "0" },
+    leavesTaken: { type: String, default: "0" },
+    leavesAbsent: { type: String, default: "0" },
+    pendingApproval: { type: String },
+    workingDays: { type: String, default: "0" },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    noOfDays: { type: String, default: "0" },
+    remainingLeave: { type: String },
     reason: { type: String },
     status: { type: String },
     remark: { type: String },
@@ -47,8 +54,8 @@ const LeavesSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-
-LeavesSchema.pre('save', function (next) {
+// Pre-save hook to format `from` and `to` dates
+leavesSchema.pre('save', function (next) {
     if (this.from) {
         this.from = moment(this.from).format('D MMM YYYY');
     }
@@ -58,10 +65,7 @@ LeavesSchema.pre('save', function (next) {
     next();
 });
 
- 
-
-const Leaves = mongoose.model('Leaves', LeavesSchema);
-const LeavesType = mongoose.model('Leaves Type', leaveTypeSchema);
-
+const Leaves = mongoose.model('Leaves', leavesSchema);
 const Holiday = mongoose.model('Holiday', holidaySchema);
-module.exports = { Leaves, Holiday ,LeavesType }
+
+module.exports = { Leaves, LeaveType, Holiday };
