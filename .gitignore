@@ -3,5 +3,5 @@ node_modules
  
  
 # Ignore Firebase service account keys
-firebase-service-account.json
+ firebase-service-account.json
 utils/new-firebase-service-account.json
