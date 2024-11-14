@@ -5,7 +5,7 @@ const fs = require('fs');
 dotenv.config();
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
+// console.log("serviceAccount",serviceAccount)
 // // Read and parse the JSON file as an object
 // let serviceAccount;
 // try {
