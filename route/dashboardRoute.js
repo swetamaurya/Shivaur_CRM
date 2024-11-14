@@ -10,8 +10,8 @@ const Policy = require("../model/policyModel");
 const { Invoice, Estimate } = require("../model/invoiceModel");
 const { Department, Designation } = require("../model/departmentModel");
  const { Leaves, Holiday ,LeaveType} = require("../model/holidayModel");
- const {   Expenses } = require("../model/paymentModel");
-const { Termination, Resignation } = require("../model/performationsModel");
+ const  Expenses   = require('../model/expensesModel');
+ const { Termination, Resignation } = require("../model/performationsModel");
  const ExcelJS = require("exceljs")
 
 
