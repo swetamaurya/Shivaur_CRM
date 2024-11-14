@@ -26,6 +26,24 @@ route.get('/invoice/get',auth, async (req, res) => {
     }
 });
 
+route.get('/invoice/get/:_id', auth, async (req, res) => {
+    try {
+        const { _id } = req.params; // Access _id from req.query
+        if (!_id) {
+            return res.status(400).json({ message: 'Invoice ID (_id) is required' });
+        }
+
+        const invoice = await Invoice.findById(_id);
+        
+        if (!invoice) {
+            return res.status(404).json({ message: 'Invoice not found' });
+        }
+
+        res.status(200).json(invoice);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching Invoice', error: error.message });
+    }
+});
 
 route.post('/invoice/update',auth, async (req, res) => {
     try {

@@ -92,9 +92,7 @@ route.get('/leaves/get', auth, async (req, res) => {
         // Define the query based on role
         let query = {};
         if (roles === "Employee") {
-            // For Employees, filter by their own userId (as a string)
             query = { employee: userId };
-            console.log(query)
         }
 
         // Fetch the leaves based on the query
@@ -102,9 +100,7 @@ route.get('/leaves/get', auth, async (req, res) => {
             .populate('employee', 'name email')
             .populate('approvedBy', 'name email')
             .populate('leaveType', 'leaveName')
-            .sort({ createdAt: -1 }); // Sorting by created date (most recent first)
-
-        console.log("Fetched Leaves:", leaves); // Log the fetched leaves
+            .sort({ createdAt: -1 });
 
         // Calculate leave summary
         const totalLeavesTaken = leaves.reduce((sum, leave) => sum + Number(leave.leavesTaken || 0), 0);
@@ -115,6 +111,13 @@ route.get('/leaves/get', auth, async (req, res) => {
         const totalAvailableLeaves = leaves.length > 0 ? Number(leaves[0].totalLeaves) : 0;
         const totalRemainingLeaves = totalAvailableLeaves - totalLeavesTaken;
 
+        // Calculate leave type counts
+        const leaveTypeCounts = leaves.reduce((counts, leave) => {
+            const typeName = leave.leaveType?.leaveName || 'Other Leave';
+            counts[typeName] = (counts[typeName] || 0) + 1;
+            return counts;
+        }, {});
+
         res.status(200).json({
             summary: {
                 totalLeavesTaken,
@@ -124,6 +127,7 @@ route.get('/leaves/get', auth, async (req, res) => {
                 totalAvailableLeaves,
                 totalRemainingLeaves,
             },
+            leaveTypeCounts,
             leaves
         });
     } catch (error) {
@@ -136,16 +140,17 @@ route.get('/leaves/get', auth, async (req, res) => {
 
 
 
+
 // Route to get a specific leave request by ID
 route.get('/leaves/get/:id', auth, async (req, res) => {
     try {
         const {id} = req.params
-        console.log(req.params)
-        console.log("hi helly bro :- ",id)
+        // console.log(req.params)
+        // console.log("hi helly bro :- ",id)
          const leave = await Leaves.findById(id)
             .populate('employee', 'name email userId')
             .populate('approvedBy', 'name email userId')
-            .populate('leaveType', 'leaveName')
+            .populate('leaveType', 'leaveName').sort({_id:-1})
 
         console.log("leave : - ",leave);
 
@@ -203,7 +208,7 @@ route.post("/leaves/delete", auth, async (req, res) => {
 // Route to approve or decline a leave request (Admins only)
 route.post('/leaves/approve', auth, async (req, res) => {
     const { _id, leaveStatus } = req.body;
-    const approvedBy = req.user._id;
+    const approvedBy = req.user.id;
 
     if (req.user.roles !== 'Admin') {
         return res.status(403).json({ message: 'Access denied: Only admins can approve or decline leave requests.' });
@@ -222,7 +227,6 @@ route.post('/leaves/approve', auth, async (req, res) => {
 
         if (!updatedLeave) return res.status(404).json({ message: 'Leave request not found' });
 
-        const message = leaveStatus === 'Approved' ? 'Leave approved successfully' : 'Leave declined';
         res.status(200).json({ message, leave: updatedLeave });
     } catch (error) {
         console.error(`Error updating leave request: ${error.message}`);
@@ -263,7 +267,7 @@ route.get('/leavesType/get', auth, async (req, res) => {
     }
 });
 
-route.get('/leavesType/get/id', auth, async (req, res) => {
+route.get('/leavesType/get/:id', auth, async (req, res) => {
     try {
         const {id} = req.params
         console.log("leave type",req.params)
