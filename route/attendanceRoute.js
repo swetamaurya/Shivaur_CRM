@@ -8,7 +8,7 @@ const DEFAULT_BREAK_DURATION_MINUTES = 60;
 // Punch action endpoint
 router.post("/attendance/punch", auth, async (req, res) => {
   const { userId, action } = req.body;
-  const currentDate = new Date().toISOString().split("T")[0];
+  const currentDate = new Date().toLocaleDateString('en-CA'); // Using local date in YYYY-MM-DD format
 
   try {
       let attendanceRecord = await Attendance.findOne({ userId, date: currentDate });
@@ -29,7 +29,6 @@ router.post("/attendance/punch", auth, async (req, res) => {
       const now = new Date();
 
       if (action === "workPunchIn") {
-          // Set status to "Present" on the first punch-in
           if (attendanceRecord.status === "Absent") {
               attendanceRecord.status = "Present";
           }
@@ -47,7 +46,6 @@ router.post("/attendance/punch", auth, async (req, res) => {
           if (latestWorkSession && !latestWorkSession.punchOut) {
               latestWorkSession.punchOut = now;
 
-              // Calculate work session duration and update totalWorkHours in minutes
               const workDurationMinutes = Math.floor((now - new Date(latestWorkSession.punchIn)) / (1000 * 60));
               attendanceRecord.totalWorkHours += workDurationMinutes;
           } else {
@@ -60,7 +58,6 @@ router.post("/attendance/punch", auth, async (req, res) => {
               return res.status(200).json({ message: "Already on break.", attendanceRecord });
           }
 
-          // Add a new break session
           attendanceRecord.breakSessions.push({ punchIn: now });
 
       } else if (action === "breakPunchOut") {
@@ -68,7 +65,6 @@ router.post("/attendance/punch", auth, async (req, res) => {
           if (latestBreakSession && !latestBreakSession.punchOut) {
               latestBreakSession.punchOut = now;
 
-              // Calculate break session duration and update totalBreakHours in minutes
               const breakDurationMinutes = Math.floor((now - new Date(latestBreakSession.punchIn)) / (1000 * 60));
               attendanceRecord.totalBreakHours += breakDurationMinutes;
           } else {
@@ -79,15 +75,14 @@ router.post("/attendance/punch", auth, async (req, res) => {
           return res.status(400).json({ message: "Invalid action type." });
       }
 
-      // Save the updated attendance record
       await attendanceRecord.save();
-
       res.status(200).json({ message: "Punch action successful", attendanceRecord });
   } catch (error) {
       console.error("Error:", error.message);
       res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
+
 
 // Fetch attendance records endpoint
 router.get("/attendance/get", auth, async (req, res) => {
