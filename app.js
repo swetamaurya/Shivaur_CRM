@@ -22,6 +22,10 @@ app.use(express.json());
 app.use(cors())
 
 
+app.get("/test",async (req,res)=>{
+    return res.status(200).send("Welcome Shivour👍")
+})
+
  
 app.use("/user" , UserRoute)
 app.use("/project", ProjectRoute)
@@ -38,9 +42,7 @@ app.use("/",ResignationRouter)
 app.use("/",dashboardRoute)
 
 
-app.get("/test",async (req,res)=>{
-    return res.status(200).send("Welcome Shivour👍")
-})
+
 
  
 app.listen(PORT , async (req,res)=>{
