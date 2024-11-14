@@ -1,7 +1,8 @@
 const express = require('express');
 const { auth } = require('../Middleware/authorization');
 const { Holiday, Leaves ,LeaveType } = require('../model/holidayModel');
- const route = express.Router();
+const { User } = require('../model/userModel');
+const route = express.Router();
 
 // Holiday CRUD Operations
 
@@ -140,22 +141,26 @@ route.get('/leaves/get/:id', auth, async (req, res) => {
     try {
         const {id} = req.params
         console.log(req.params)
+        console.log("hi helly bro :- ",id)
          const leave = await Leaves.findById(id)
             .populate('employee', 'name email userId')
             .populate('approvedBy', 'name email userId')
-            .populate('leaveType', 'leaveName');
+            .populate('leaveType', 'leaveName')
+
+        console.log("leave : - ",leave);
 
         if (!leave) return res.status(404).json({ error: 'Leave not found' });
 
-      
+        // if (req.user.roles !== 'Admin' && leave.employee._id.toString() !== req.user._id.toString()) {
+        //     return res.status(403).json({ message: 'Access denied: Unauthorized to view this leave request.' });
+        // }
 
         res.status(200).json(leave);
     } catch (error) {
-        console.error('Error fetching leave:', error.message);
+        console.error('Error fetching leave:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
-
 
 // Route to update a leave request (Admins only or employee updating their own leave)
 route.post('/leaves/update', auth, async (req, res) => {
@@ -164,7 +169,9 @@ route.post('/leaves/update', auth, async (req, res) => {
         const leave = await Leaves.findById(_id);
         if (!leave) return res.status(404).json({ error: 'Leave not found' });
 
-      
+        // if (req.user.roles !== 'Admin' && leave.employee.toString() !== req.user._id.toString()) {
+        //     return res.status(403).json({ message: 'Access denied: Unauthorized to update this leave.' });
+        // }
 
         const updatedLeave = await Leaves.findByIdAndUpdate(_id, req.body, { new: true });
         res.status(200).send(updatedLeave);
@@ -174,7 +181,24 @@ route.post('/leaves/update', auth, async (req, res) => {
     }
 });
 
- 
+// Route to delete a leave (Admins only or employee deleting their own leave)
+route.post("/leaves/delete", auth, async (req, res) => {
+    const { _id } = req.body;
+    try {
+        const leave = await Leaves.findById(_id);
+        if (!leave) return res.status(404).json({ error: 'Leave not found' });
+
+        if (req.user.roles !== 'Admin' && leave.employee.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Access denied: Unauthorized to delete this leave.' });
+        }
+
+        await leave.deleteOne();
+        res.status(200).send({ message: 'Leave deleted successfully.' });
+    } catch (error) {
+        console.error("Error deleting leave:", error);
+        return res.status(500).send(`Internal server error: ${error.message}`);
+    }
+});
 
 // Route to approve or decline a leave request (Admins only)
 route.post('/leaves/approve', auth, async (req, res) => {
@@ -230,7 +254,7 @@ route.post('/leavesType/post', auth, async (req, res) => {
 
 route.get('/leavesType/get', auth, async (req, res) => {
     try {
-        const leaves = await LeaveType.find().sort({_id :-1})
+        const leaves = await LeaveType.find()
 
         res.status(200).send(leaves);
     } catch (error) {
@@ -271,5 +295,22 @@ route.get('/leavesType/get/id', auth, async (req, res) => {
 });
 
 
- 
+route.post("/leavesType/delete", auth, async (req, res) => {
+    const { _id } = req.body;
+    try {
+        const leave = await LeaveType.findById(_id);
+        if (!leave) return res.status(404).json({ error: 'Leave not found' });
+
+        if (req.user.roles !== 'Admin' && leave.employee.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Access denied: Unauthorized to delete this leave.' });
+        }
+
+        await leave.deleteOne();
+        res.status(200).send({ message: 'Leave deleted successfully.' });
+    } catch (error) {
+        console.error("Error deleting leave:", error);
+        return res.status(500).send(`Internal server error: ${error.message}`);
+    }
+});
+
 module.exports = route;

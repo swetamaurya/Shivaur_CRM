@@ -10,7 +10,6 @@ const holidaySchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-
 // Leave Type Schema
 const leaveTypeSchema = new mongoose.Schema({
     leaveName: { type: String, required: true },
@@ -19,7 +18,6 @@ const leaveTypeSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
-const LeaveType = mongoose.model('LeaveType', leaveTypeSchema); // Changed model name for consistency
 
 // Leaves Schema
 const leavesSchema = new mongoose.Schema({
@@ -55,17 +53,18 @@ const leavesSchema = new mongoose.Schema({
 });
 
 // Pre-save hook to format `from` and `to` dates
-leavesSchema.pre('save', function (next) {
-    if (this.from) {
-        this.from = moment(this.from).format('D MMM YYYY');
-    }
-    if (this.to) {
-        this.to = moment(this.to).format('D MMM YYYY');
-    }
-    next();
-});
+// leavesSchema.pre('save', function (next) {
+//     if (this.from) {
+//         this.from = moment(this.from).format('DD MMM YYYY');
+//     }
+//     if (this.to) {
+//         this.to = moment(this.to).format('DD MMM YYYY');
+//     }
+//     next();
+// });
 
 const Leaves = mongoose.model('Leaves', leavesSchema);
+const LeaveType = mongoose.model('LeaveType', leaveTypeSchema); // Changed model name for consistency
 const Holiday = mongoose.model('Holiday', holidaySchema);
 
 module.exports = { Leaves, LeaveType, Holiday };
