@@ -4,4 +4,4 @@ node_modules
  
 # Ignore Firebase service account keys
  firebase-service-account.json
- git
+ 
