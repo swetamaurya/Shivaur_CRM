@@ -5,133 +5,135 @@ const { auth } = require("../Middleware/authorization");
 const { User } = require("../model/userModel");
 
 const DEFAULT_BREAK_DURATION_MINUTES = 60;
-
+// Punch action endpoint
 router.post("/attendance/punch", auth, async (req, res) => {
-    const { userId, action } = req.body;
-    const currentDate = new Date().toISOString().split("T")[0];
+  const { userId, action } = req.body;
+  const currentDate = new Date().toISOString().split("T")[0];
 
-    try {
-        let attendanceRecord = await Attendance.findOne({ userId, date: currentDate });
+  try {
+      let attendanceRecord = await Attendance.findOne({ userId, date: currentDate });
 
-        // Create a new attendance record if it doesn't exist
-        if (!attendanceRecord) {
-            attendanceRecord = new Attendance({
-                userId,
-                date: currentDate,
-                workSessions: [],
-                breakSessions: [],
-                totalWorkHours: 0,
-                totalBreakHours: 0,
-                status: "Absent",
-            });
-        }
+      // Create a new attendance record if it doesn't exist
+      if (!attendanceRecord) {
+          attendanceRecord = new Attendance({
+              userId,
+              date: currentDate,
+              workSessions: [],
+              breakSessions: [],
+              totalWorkHours: 0,
+              totalBreakHours: 0,
+              status: "Absent",
+          });
+      }
 
-        const now = new Date();
+      const now = new Date();
 
-        if (action === "workPunchIn") {
-            // Change status to "Present" on first punch-in
-            if (attendanceRecord.status === "Absent") {
-                attendanceRecord.status = "Present";
-            }
+      if (action === "workPunchIn") {
+          // Set status to "Present" on the first punch-in
+          if (attendanceRecord.status === "Absent") {
+              attendanceRecord.status = "Present";
+          }
 
-            const latestWorkSession = attendanceRecord.workSessions[attendanceRecord.workSessions.length - 1];
-            if (latestWorkSession && latestWorkSession.punchIn && !latestWorkSession.punchOut) {
-                return res.status(200).json({ message: "Already punched in.", attendanceRecord });
-            }
+          const latestWorkSession = attendanceRecord.workSessions[attendanceRecord.workSessions.length - 1];
+          if (latestWorkSession && latestWorkSession.punchIn && !latestWorkSession.punchOut) {
+              return res.status(200).json({ message: "Already punched in.", attendanceRecord });
+          }
 
-            // Add a new work session
-            attendanceRecord.workSessions.push({ punchIn: now });
+          // Add a new work session
+          attendanceRecord.workSessions.push({ punchIn: now });
 
-        } else if (action === "workPunchOut") {
-            const latestWorkSession = attendanceRecord.workSessions[attendanceRecord.workSessions.length - 1];
-            if (latestWorkSession && !latestWorkSession.punchOut) {
-                latestWorkSession.punchOut = now;
+      } else if (action === "workPunchOut") {
+          const latestWorkSession = attendanceRecord.workSessions[attendanceRecord.workSessions.length - 1];
+          if (latestWorkSession && !latestWorkSession.punchOut) {
+              latestWorkSession.punchOut = now;
 
-                // Calculate work session duration and update totalWorkHours
-                const workDurationMinutes = Math.floor((now - new Date(latestWorkSession.punchIn)) / (1000 * 60));
-                attendanceRecord.totalWorkHours += workDurationMinutes;
-            } else {
-                return res.status(400).json({ message: "Cannot punch out without punching in." });
-            }
+              // Calculate work session duration and update totalWorkHours in minutes
+              const workDurationMinutes = Math.floor((now - new Date(latestWorkSession.punchIn)) / (1000 * 60));
+              attendanceRecord.totalWorkHours += workDurationMinutes;
+          } else {
+              return res.status(400).json({ message: "Cannot punch out without punching in." });
+          }
 
-        } else if (action === "breakPunchIn") {
-            const latestBreakSession = attendanceRecord.breakSessions[attendanceRecord.breakSessions.length - 1];
-            if (latestBreakSession && !latestBreakSession.punchOut) {
-                return res.status(200).json({ message: "Already on break.", attendanceRecord });
-            }
+      } else if (action === "breakPunchIn") {
+          const latestBreakSession = attendanceRecord.breakSessions[attendanceRecord.breakSessions.length - 1];
+          if (latestBreakSession && !latestBreakSession.punchOut) {
+              return res.status(200).json({ message: "Already on break.", attendanceRecord });
+          }
 
-            // Add a new break session
-            attendanceRecord.breakSessions.push({ punchIn: now });
+          // Add a new break session
+          attendanceRecord.breakSessions.push({ punchIn: now });
 
-        } else if (action === "breakPunchOut") {
-            const latestBreakSession = attendanceRecord.breakSessions[attendanceRecord.breakSessions.length - 1];
-            if (latestBreakSession && !latestBreakSession.punchOut) {
-                latestBreakSession.punchOut = now;
+      } else if (action === "breakPunchOut") {
+          const latestBreakSession = attendanceRecord.breakSessions[attendanceRecord.breakSessions.length - 1];
+          if (latestBreakSession && !latestBreakSession.punchOut) {
+              latestBreakSession.punchOut = now;
 
-                // Calculate break session duration and update totalBreakHours
-                const breakDurationMinutes = Math.floor((now - new Date(latestBreakSession.punchIn)) / (1000 * 60));
-                attendanceRecord.totalBreakHours += breakDurationMinutes;
-            } else {
-                return res.status(400).json({ message: "Cannot end break without starting it." });
-            }
+              // Calculate break session duration and update totalBreakHours in minutes
+              const breakDurationMinutes = Math.floor((now - new Date(latestBreakSession.punchIn)) / (1000 * 60));
+              attendanceRecord.totalBreakHours += breakDurationMinutes;
+          } else {
+              return res.status(400).json({ message: "Cannot end break without starting it." });
+          }
 
-        } else {
-            return res.status(400).json({ message: "Invalid action type." });
-        }
+      } else {
+          return res.status(400).json({ message: "Invalid action type." });
+      }
 
-        // Save the updated attendance record
-        await attendanceRecord.save();
+      // Save the updated attendance record
+      await attendanceRecord.save();
 
-        res.status(200).json({ message: "Punch action successful", attendanceRecord });
-    } catch (error) {
-        console.error("Error:", error.message);
-        res.status(500).json({ error: "Internal Server Error", details: error.message });
-    }
+      res.status(200).json({ message: "Punch action successful", attendanceRecord });
+  } catch (error) {
+      console.error("Error:", error.message);
+      res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
 });
 
-// Fetch attendance records
+// Fetch attendance records endpoint
 router.get("/attendance/get", auth, async (req, res) => {
-    try {
-        const { roles, id: userId } = req.user;
-        const query = roles === 'Admin' ? {} : { userId };
+  try {
+      const { roles, id: userId } = req.user;
+      const query = roles === 'Admin' ? {} : { userId };
 
-        const attendanceRecords = await Attendance.find(query);
+      const attendanceRecords = await Attendance.find(query);
 
-        res.status(200).json({
-            message: "Attendance records fetched successfully",
-            attendanceRecords: attendanceRecords.map(record => {
-                const latestWorkSession = record.workSessions[record.workSessions.length - 1] || {};
-                const punchIn = latestWorkSession.punchIn || null;
-                const punchOut = latestWorkSession.punchOut || null;
+      res.status(200).json({
+          message: "Attendance records fetched successfully",
+          attendanceRecords: attendanceRecords.map(record => {
+              const latestWorkSession = record.workSessions[record.workSessions.length - 1] || {};
+              const punchIn = latestWorkSession.punchIn || null;
+              const punchOut = latestWorkSession.punchOut || null;
 
-                // Calculate work and break times
-                const totalWorkMinutes = record.totalWorkHours;
-                const totalBreakMinutes = record.totalBreakHours;
+              // Calculate and format total work and break hours from minutes
+              const totalWorkMinutes = record.totalWorkHours;
+              const totalBreakMinutes = record.totalBreakHours;
 
-                // Format work and break hours display
-                const workHours = Math.floor(totalWorkMinutes / 60);
-                const workMinutes = totalWorkMinutes % 60;
-                const totalWorkHoursDisplay = `${workHours} hrs ${workMinutes} mins`;
+              const workHours = Math.floor(totalWorkMinutes / 60);
+              const workMinutes = totalWorkMinutes % 60;
+              const totalWorkHoursDisplay = `${workHours} hrs ${workMinutes} mins`;
 
-                const breakHours = Math.floor(totalBreakMinutes / 60);
-                const breakMinutes = totalBreakMinutes % 60;
-                const totalBreakHoursDisplay = `${breakHours} hrs ${breakMinutes} mins`;
+              const breakHours = Math.floor(totalBreakMinutes / 60);
+              const breakMinutes = totalBreakMinutes % 60;
+              const totalBreakHoursDisplay = `${breakHours} hrs ${breakMinutes} mins`;
 
-                return {
-                    date: record.date,
-                    punchIn,
-                    punchOut,
-                    totalWorkHours: totalWorkHoursDisplay,
-                    totalBreakHours: totalBreakHoursDisplay,
-                    status: record.status,
-                };
-            })
-        });
-    } catch (error) {
-        console.error("Error fetching attendance records:", error.message);
-        res.status(500).json({ error: "Internal Server Error", details: error.message });
-    }
+              return {
+                  date: record.date,
+                  punchIn,
+                  punchOut,
+                  workSessions: record.workSessions,  // Include all work sessions
+                  breakSessions: record.breakSessions,  // Include all break sessions
+                  totalWorkHours: totalWorkHoursDisplay,
+                  totalBreakHours: totalBreakHoursDisplay,
+                  status: record.status,
+              };
+          })
+      });
+  } catch (error) {
+      console.error("Error fetching attendance records:", error.message);
+      res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
 });
+
 
 
 
