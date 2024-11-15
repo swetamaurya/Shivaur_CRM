@@ -1,5 +1,5 @@
 const express = require("express")
-const {User ,Asset} = require('../model/userModel')
+const {User  } = require('../model/userModel')
 const { uploadFileToFirebase , bucket} = require('../utils/fireBase');
 const bcryptjs = require("bcryptjs")
 const jwt = require("jsonwebtoken")
@@ -273,7 +273,8 @@ route.get('/data/get', auth, async (req, res) => {
       // Fetch employees with assigned project details populated
       const employees = await User.find({ roles: { $in: ["Employee", "Supervisor"] } })
         .populate("assigned", "projectName projectId")
-        .populate("assets", "assetName assetId")
+        .populate("leave" )
+        .populate("attendance")
         .sort({ _id: -1 })
         .skip(skip)
         .limit(limit);
@@ -293,7 +294,8 @@ route.get('/data/get', auth, async (req, res) => {
       const employee = await User.find({ _id: id })
         .populate("assigned", "projectName projectId")
         .populate("clientName", "name userId")
-        .populate("assets", "assetName assetId")
+        .populate("leave"  ,"totalLeaves")
+        .populate("attendance")
         .sort({ _id: -1 });
  
       users = { employee };
@@ -303,8 +305,8 @@ route.get('/data/get', auth, async (req, res) => {
       const employees = await User.find({ roles: "Employee" })
       .populate("assigned", "projectName projectId")
       .populate("clientName", "name userId")
-      .populate("assets", "assetName assetId")
-        .sort({ _id: -1 })
+      .populate('leave')
+      .populate("attendance")        .sort({ _id: -1 })
         .skip(skip)
         .limit(limit);
 
@@ -344,11 +346,15 @@ route.get('/get/:id', auth, async (req, res) => {
      const user = await User.findById(id)
      .populate("assigned", "projectName projectId")
      .populate("clientName", "name userId")
-     .populate('assets');
+     .populate('leave')
+    .populate({
+      path: "attendance",
+      select: "date status checkIn checkOut" // Populate attendance details with date, status, etc.
+    });
     if (!user) {
       return res.status(404).json({ message: 'user not found' });
     }
-
+    console.log(user);
     res.status(200).json(user);
   } catch (error) {
     logger.error(`Error fetching user: ${error.message}`);
@@ -565,7 +571,390 @@ route.post("/error", auth, async (req, res) => {
 
  
 
+route.get("/export", auth, async (req, res) => {
+  const { id, roles } = req.user;
 
+  try {
+    const {
+      data,
+      key,
+      value,
+      userId,
+      ids,        // ids could be a string or an array
+      name,
+      page = 1,
+      limit = 10,
+      format 
+    } = req.query;
+
+    if (!data) {
+      return res.status(400).json({ error: "Missing data parameter" });
+    }
+
+    let filterQuery = {};
+    const skip = (page - 1) * limit;
+
+    // Check if ids is an array or a string that needs to be split
+    if (ids) {
+      if (Array.isArray(ids)) {
+        filterQuery._id = { $in: ids };  // Use it directly if it's already an array
+      } else {
+        filterQuery._id = { $in: ids.split(',') };  // Split it if it's a comma-separated string
+      }
+    }
+
+    // Handle specific user filtering by userId (if present)
+    if (userId) {
+      filterQuery.userId = { $regex: new RegExp(userId, 'i') }; // Flexible userId search
+    }
+
+    // Handle dynamic filtering based on key-value pairs (e.g., status=Active)
+    if (key && value) {
+      filterQuery[key] = { $regex: new RegExp(value, 'i') }; // Case-insensitive filtering
+    }
+
+    let UsersData;
+
+    if (data === "all") {
+      if (roles === "Admin" || roles === "Supervisor") {
+        // Fetch Users Data with Pagination
+        UsersData = await User.find(filterQuery)
+          .skip(skip)
+          .limit(parseInt(limit));
+
+        const totalCount = await User.countDocuments(filterQuery);
+
+        // Check if the request asks for Excel file download
+        if (format === 'excel') {
+          return generateExcelFile(res, UsersData, totalCount);
+        }
+
+        // Return normal JSON response if not Excel
+        return res.status(200).json({
+          message: "Users fetched successfully!",
+          data: UsersData,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          currentPage: page,
+        });
+
+      } else if (roles === "Employee") {
+        const employeeDetails = await User.findOne({ _id: id });
+        const projects = await Project.find({ assignedTo: id });
+        const clients = await User.find({ assignedTo: id });
+
+        UsersData = {
+          employeeDetails,
+          projects,
+          clients,
+        };
+
+        return res.status(200).json({
+          message: "Employee data fetched successfully!",
+          data: UsersData,
+        });
+
+      } else {
+        return res.status(403).send("Unauthorized.");
+      }
+
+    } else if (data === "search") {
+      if (!userId && !name) {
+        return res.status(400).json({ error: "Missing search parameters: userId or name" });
+      }
+
+      let searchQuery = {};
+
+      if (userId) {
+        searchQuery.userId = { $regex: new RegExp(userId, "i") }; 
+      }
+      if (name) {
+        searchQuery.name = { $regex: new RegExp(name, "i") };
+      }
+
+      if (roles === "Admin" || roles === "Supervisor") {
+        UsersData = await User.find(searchQuery)
+          .skip(skip)
+          .limit(parseInt(limit));
+
+        const totalCount = await User.countDocuments({ ...filterQuery, ...searchQuery });
+
+        if (format === 'excel') {
+          return generateExcelFile(res, UsersData, totalCount);
+        }
+
+        return res.status(200).json({
+          message: "Search results fetched successfully!",
+          data: UsersData,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          currentPage: page,
+        });
+
+      } else if (roles === "Employee") {
+        const employeeDetails = await User.findOne({
+          _id: id,
+          ...searchQuery,
+        });
+        const projects = await Project.find({ assignedTo: id });
+        const clients = await User.find({ assignedTo: id });
+
+        UsersData = {
+          employeeDetails,
+          projects,
+          clients,
+        };
+
+        return res.status(200).json({
+          message: "Search results fetched successfully!",
+          data: UsersData,
+        });
+
+      } else {
+        return res.status(403).send("Unauthorized.");
+      }
+
+    } else {
+      return res.status(400).json({ error: "Invalid data parameter" });
+    }
+  } catch (error) {
+    console.error("Error fetching/exporting Users:", error);
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
+
+// Function to generate and send Excel file
+const generateExcelFile = async (res, UsersData, totalCount) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Users Data');
+
+  // Define the columns for the Excel file
+  worksheet.columns = [
+    { header: 'ID', key: 'userId', width: 20 },
+    { header: 'Name', key: 'name', width: 30 },
+    { header: 'Email', key: 'email', width: 30 },
+    { header: 'Mobile', key: 'mobile', width: 30 },
+    { header: 'Role', key: 'role', width: 20 },
+    { header: 'Designation', key: 'designation', width: 30 },
+    { header: 'Department', key: 'department', width: 30 },
+    { header: 'Status', key: 'status', width: 30 },
+    { header: 'Joining Date', key: 'joiningDate', width: 30 },
+    { header: 'DOB', key: 'DOB', width: 30 },
+    { header: 'Created At', key: 'createdAt', width: 20 },
+  ];
+
+  // Add user data to worksheet
+  UsersData.forEach(user => {
+    worksheet.addRow({
+      _id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      email: user.email,
+      role: user.role,
+      designation: user.designation, 
+      department: user.department, 
+      status: user.status, 
+      joiningDate: user.joiningDate,
+      DOB: user.DOB,
+      createdAt: user.createdAt.toISOString().split('T')[0], // Format date
+    });
+  });
+
+  // Add total count in the last row
+  worksheet.addRow({});
+  worksheet.addRow({ _id: '', name: 'Total Users:', email: totalCount });
+
+  // Set headers for file download
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="users-data.xlsx"');
+
+  // Write workbook to response stream
+  await workbook.xlsx.write(res);
+  res.end();
+};
+
+
+
+
+/////////////////////////////  assets /////////////////////////////////////////////
+
+// CREATE a new asset
+route.post("/assets/create", auth, upload.array('file'), async (req, res) => {
+  try {
+     let fileUrls = [];
+
+        if (req.files && req.files.length > 0) {
+              const newFileUrls = await uploadFileToFirebase(req.files); 
+              fileUrls = [...fileUrls, ...newFileUrls];  
+    }
+
+     const newAsset = new Asset({
+      ...req.body,           
+      files: fileUrls,           
+       assignedBy:req.user.id, 
+
+
+    });
+    // console.log(req.body)
+     const savedAsset = await newAsset.save();
+    // console.log("Asset added and saved:", savedAsset);
+
+     return res.status(200).send({ message: 'Asset created successfully', Asset: savedAsset });
+
+  } catch (error) {
+    console.error('Error adding files to Asset:', error);
+    return res.status(500).send({ message: `Internal server error: ${error.message}` });
+  }
+});
+
+// READ all assets (Admin-only access)
+route.get('/assets/get',auth, async (req, res) => {
+  try {
+    const assets = await Asset.find();
+    res.json(assets);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// READ a single asset by ID
+route.get('/assets/:id',auth, async (req, res) => {
+  try {
+    const asset = await Asset.findById(req.params.id);
+    if (!asset) 
+      return res.status(404).json({ message: 'Asset not found' });
+    res.json(asset);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+ 
+route.post("/assets/update", auth, upload.array('file'), async (req, res) => {
+  try {
+    const { _id, ...updateData } = req.body;
+    let fileUrls = [];
+
+    // If there are new files, upload them
+    if (req.files && req.files.length > 0) {
+      const newFileUrls = await uploadFileToFirebase(req.files);
+      fileUrls = [...fileUrls, ...newFileUrls];
+    }
+
+    // Find the current Asset
+    const currentAsset = await Asset.findById(_id);
+    if (!currentAsset) {
+      return res.status(404).send("Asset not found");
+    }
+
+    // Prepare the update fields
+    const updateFields = {
+      ...updateData,
+      files: fileUrls.length > 0 ? [...currentAsset.files, ...fileUrls] : currentAsset.files
+    };
+
+    // Update the Asset
+    const updatedAsset= await Asset.findByIdAndUpdate(_id, updateFields, { new: true });
+
+    return res.status(200).json({
+      message: 'Asset updated successfully',
+      Task: updatedAsset
+    });
+  } catch (error) {
+    console.error("Error updating Asset:", error);
+    return res.status(500).send(`Internal server error: ${error.message}`);
+  }
+});
+
+// DELETE an asset by ID
+route.post("/assets/delete", auth, async (req, res) => {
+  try {
+    const { _id} = req.body;
+
+    if (!_id || (Array.isArray(_id) && _id.length === 0)) {
+      return res.status(400).send("No _id provided for deletion.");
+    }
+
+     const _idArray = Array.isArray(_id) ? _id : [_id];
+
+    // Delete multiple items if _id is an array, otherwise delete a single item
+    const deletedAsset = await Asset.deleteMany({ _id: { $in: _idArray } });
+
+    if (deletedAsset.deletedCount === 0) {
+      return res.status(404).send("No Asset found for the provided ID(s).");
+    }
+
+    return res.status(200).send({
+      message: `${deletedAsset.deletedCount} Asset deleted successfully.`,
+      deletedAsset
+    });
+  } catch (error) {
+    console.error("Error deleting Asset:", error);
+    return res.status(500).send(`Internal server error: ${error.message}`);
+  }
+});
+
+// ASSIGN an asset to a user
+route.post('/assets/assign', auth, async (req, res) => {
+  try {
+    const { assetIds, userId } = req.body;
+
+    // Validate that both assetIds and userId are provided
+    if (!Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ message: 'assetIds must be a non-empty array' });
+    }
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required' });
+    }
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Iterate over the asset IDs and assign each asset to the user
+    const updatedAssets = [];
+    for (const assetId of assetIds) {
+      const asset = await Asset.findById(assetId);
+      if (asset) {
+        asset.assignee = userId;
+        await asset.save();
+        updatedAssets.push(asset);
+      }
+    }
+
+    res.json({ message: 'Assets assigned successfully', assets: updatedAssets });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+
+// GET assets assigned to a specific user based on role
+route.get('/users/:userId/assets', auth, async (req, res) => {
+  try {
+    const { roles, id } = req.user;
+
+    // Check if the requested user ID matches the logged-in user ID
+    const user = await User.findById(req.params.userId)
+      .populate('assets', 'assetName assetId');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Admin can view any user's assets, but employees can only view their own
+    if (roles === "Admin" || (roles === "Employee" && req.params.userId === id.toString())) {
+      res.status(200).json(user.assets);
+    } else {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 
 module.exports = route

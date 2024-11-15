@@ -44,6 +44,26 @@ router.get('/expenses/get', auth, async (req, res) => {
   }
 });
 
+router.get('/expenses/get/:_id', auth, async (req, res) => {
+  try {
+      const { _id } = req.params; // Access _id from req.query
+      if (!_id) {
+          return res.status(400).json({ message: 'Expenses ID (_id) is required' });
+      }
+
+      const expenses = await Expenses.findById(_id);
+      
+      if (!expenses) {
+          return res.status(404).json({ message: 'Expenses not found' });
+      }
+
+      res.status(200).json(expenses);
+  } catch (error) {
+      res.status(500).json({ message: 'Error fetching Expenses', error: error.message });
+  }
+});
+
+
 // Route to update an expense - Admins can update any, others only their own
 router.post('/expenses/update', auth, upload.array('file'), async (req, res) => {
   try {

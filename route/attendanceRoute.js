@@ -219,7 +219,6 @@ router.get('/attendance/today', auth, async (req, res) => {
   }
 });
 
-// Route to get attendance by month and year
 router.get('/attendance/monthYear/get', auth, async (req, res) => {
   const { month, year } = req.query;
 
@@ -272,23 +271,33 @@ router.get('/attendance/monthYear/get', auth, async (req, res) => {
 
     // Prepare formatted records with default "Absent" for missing dates
     const formattedRecords = allEmployees.map(employee => {
-      const attendance = {};
+      const dates = [];
+      const statuses = [];
+
+      // Populate dates with default "Absent" status for each day of the month
       for (let day = 1; day <= endOfMonth.getDate(); day++) {
         const dayString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        attendance[dayString] = "Absent"; // Default to "Absent"
+        dates.push(dayString);
+        statuses.push("Absent"); // Default to "Absent"
       }
 
+      // Find the employee's attendance record for the month
       const employeeRecord = attendanceRecords.find(record => record.userId.equals(employee._id));
       if (employeeRecord) {
+        // Update the default "Absent" status with actual attendance data
         employeeRecord.attendance.forEach(day => {
-          attendance[day.date] = day.status || "Absent";
+          const index = dates.indexOf(day.date);
+          if (index !== -1) {
+            statuses[index] = day.status || "Absent";
+          }
         });
       }
 
       return {
         userId: employee._id,
         name: employee.name,
-        attendance
+        dates,
+        statuses
       };
     });
 
@@ -298,6 +307,7 @@ router.get('/attendance/monthYear/get', auth, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
+
 
 // Route to get monthly attendance status for all users
 router.get("/attendance/status", auth, async (req, res) => {

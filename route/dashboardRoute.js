@@ -234,6 +234,130 @@ const generateExcelFile = async (res, data) => {
 };
 
 
+// Utility function to build a search query for each type with only date, name, and userId
+const buildSearchQuery = (criteria) => {
+  const query = {};
+
+  if (criteria.name) {
+    query.name = { $regex: new RegExp(criteria.name, 'i') };
+  }
+  if (criteria.userId) {
+    query.userId = { $regex: new RegExp(criteria.userId, 'i') };
+  }
+  if (criteria.date) {
+    query.date = criteria.date; // Exact match; adjust as needed if date format differs
+  }
+
+  return query;
+};
+
+route.get('/global-search', auth, async (req, res) => {
+  const { type, name, date, userId, page = 1, limit = 10 } = req.query;
+  const skip = (page - 1) * limit;
+  const { id: currentUser, roles } = req.user;
+
+  let model;
+  let criteria = { name, date, userId };
+  
+  // Define models based on type
+  if (type === 'project') {
+    model = Project;
+  } else if (type === 'user') {
+    model = User;
+  } else if (type === 'attendance') {
+    model = Attendance;
+  } else if (type === 'product') {
+    model = Product;
+  } else if (type === 'task') {
+    model = Task;
+  } else if (type === 'invoice') {
+    model = Invoice;
+  } else {
+    return res.status(400).json({ error: "Invalid type parameter" });
+  }
+
+  try {
+    // Build the search query based on only date, name, and userId
+    const query = buildSearchQuery(criteria);
+
+    // If the role is 'Employee', restrict to their own data
+    if (roles === 'Employee' && type !== 'user') {
+      query.userId = currentUser;
+    }
+
+    // Execute the search with pagination
+    const results = await model.find(query).skip(skip).limit(parseInt(limit));
+    const totalCount = await model.countDocuments(query);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    res.status(200).json({
+      data: results,
+      message: "Search results fetched successfully!",
+      totalCount,
+      totalPages,
+      currentPage: parseInt(page),
+      perPage: parseInt(limit)
+    });
+  } catch (error) {
+    res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
+
+route.get('/dashboard', async (req, res) => {
+  try {
+    // Fetch counts for projects, clients, tasks, and employees
+    const projectCountPromise = Project.countDocuments();
+    const clientCountPromise = User.countDocuments({ roles: "Client" });
+    const taskCountPromise = Task.countDocuments();
+    const employeeCountPromise = User.countDocuments({ roles: "Employee" });
+
+    // Fetch recent items for invoices, clients, projects, and products
+    const recentInvoicesPromise = Invoice.find().sort({ dueDate: -1 }).limit(5);
+    const recentClientsPromise = User.find({ roles: "Client" }).sort({ createdAt: -1 }).limit(5);
+    const recentProjectsPromise = Project.find().sort({ createdAt: -1 }).limit(5);
+    const recentProductsPromise = Product.find().sort({ createdAt: -1 }).limit(5);
+
+    // Await all promises simultaneously
+    const [
+      projectCount,
+      clientCount,
+      taskCount,
+      employeeCount,
+      recentInvoices,
+      recentClients,
+      recentProjects,
+      recentProducts
+    ] = await Promise.all([
+      projectCountPromise,
+      clientCountPromise,
+      taskCountPromise,
+      employeeCountPromise,
+      recentInvoicesPromise,
+      recentClientsPromise,
+      recentProjectsPromise,
+      recentProductsPromise
+    ]);
+
+    // Send a single JSON response containing all the fetched data
+    res.status(200).json({
+      counts: {
+        projectCount,
+        clientCount,
+        taskCount,
+        employeeCount
+      },
+      recentInvoices,
+      recentClients,
+      recentProjects,
+      recentProducts
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error.message);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
 
 
 

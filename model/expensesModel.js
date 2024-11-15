@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const expensesSchema = new mongoose.Schema({
     expensesId :{type: String},
     item: { type: String  },
-    expaneseName: { type: String  },
+    expanseName: { type: String  },
     purchaseDate :{type: String},
     purchaseBy :{type: String},
     amount :{type: String},

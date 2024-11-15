@@ -75,9 +75,10 @@ route.post('/leaves/post', auth, async (req, res) => {
         });
         await addLeave.save();
         console.log(addLeave)
+// Link the leave to the user's document
+await User.findByIdAndUpdate(req.user.id, { $push: { leave: addLeave._id } });
 
-        res.status(200).send(addLeave);
-    } catch (error) {
+        res.status(200).json({ message: 'Leave request created successfully', leave: addLeave });    } catch (error) {
         console.error('Error creating leave:', error.message);
         res.status(500).json({ error: 'Server error' });
     }

@@ -15,7 +15,7 @@ async function getNextSequenceValue(type) {
     Employee: 'EMP',
     Supervisor: 'SPV',
     Client: 'CLT',
-    Asset: 'AST',
+  
   };
 
   const prefix = prefixMap[type] || 'USR';
@@ -30,35 +30,8 @@ async function getNextSequenceValue(type) {
   return `${prefix}-${sequenceNumber}`;
 }
 
-// Asset schema
-const assetSchema = new mongoose.Schema({
-  assetName: { type: String  },
-  assetId: { type: String },  // Auto-generated unique ID
-  assignedDate: { type: String, default: Date.now },
-  assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  purchaseDate: { type: String },
-  purchaseFrom: { type: String },
-  manufacturer: { type: String },
-  model: { type: String },
-  serialNumber: { type: String },
-  supplier: { type: String },
-  files: [{ type: String }],  // Array of file paths or URLs
-  condition: { type: String },
-  value: { type: String },
-  warranty: { type: String },
-  warrantyEnd: { type: String },
-  amount: { type: String },
-  description: { type: String },
-  status: { type: String, enum: ['Pending', 'Approved', 'Returned'], default: 'Pending' }
-}, { timestamps: true });
-
-// Middleware to generate a unique assetId before saving
-assetSchema.pre('save', async function (next) {
-  if (!this.assetId) {
-    this.assetId = await getNextSequenceValue("Asset");
-  }
-  next();
-});
+ 
+ 
 
 // User schema with primary and secondary contact details, and bank details
 const userSchema = new mongoose.Schema({
@@ -71,8 +44,8 @@ const userSchema = new mongoose.Schema({
   document: [String],
   assigned: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Project' }],
   clientName: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  permissions: { type: [String] },
-  assets: [assetSchema],
+  // permissions: { type: [String] },
+ 
   image: { type: String },
   DOB: { type: String },
   remarks: [{ type: String }],
@@ -91,7 +64,8 @@ const userSchema = new mongoose.Schema({
   contactMobile: { type: String },
   salary: { type: String },
   payslip: { type: String },
-
+  leave:[{ type: mongoose.Schema.Types.ObjectId, ref: 'Leaves' }],
+  attendance:[{ type: mongoose.Schema.Types.ObjectId, ref: 'Attendance' }],
   // Primary Contact Information
   primaryContact: {
     name: { type: String },
@@ -134,6 +108,5 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-const Asset = mongoose.model('Asset', assetSchema);
 const User = mongoose.model('User', userSchema);
-module.exports = { User, Sequence, Asset };
+module.exports = { User, Sequence  };

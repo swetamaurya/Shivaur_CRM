@@ -14,6 +14,7 @@ const DepartmentRouter = require("./route/departmentRoute");
  const PolicyRouter = require("./route/policyRoute");
 const ResignationRouter = require("./route/performationsRoute");
 const dashboardRoute = require("./route/dashboardRoute");
+const router = require("./route/expensesRoute");
 dotenv.config()
 PORT = process.env.PORT || 2000
 
@@ -38,7 +39,7 @@ app.use("/product",ProductRoute)
 app.use("/",attendanceRouter)
  app.use("/policy",PolicyRouter)
 app.use("/",ResignationRouter)
- 
+app.use("/",router)
 app.use("/",dashboardRoute)
 
 
