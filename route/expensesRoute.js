@@ -34,15 +34,44 @@ router.post("/expenses/post", auth, upload.array('file'), async (req, res) => {
 router.get('/expenses/get', auth, async (req, res) => {
   try {
     const { roles, _id: userId } = req.user;
-    const query = roles === 'Admin' ? {} : { userId };
+    const { page, limit } = req.query; // Extract pagination parameters
 
-    const expenses = await Expenses.find(query);
-    res.status(200).json(expenses);
+    const query = roles === 'Admin' ? {} : { userId }; // Admin sees all, non-admin sees own expenses
+
+    if (!page || !limit) {
+      // If pagination parameters are not provided, return all data
+      const expenses = await Expenses.find(query).populate('purchaseBy','name').sort({ _id: -1 }); // Sort by creation date descending
+      return res.status(200).json({
+        data: expenses,
+        totalExpenses: expenses.length, // Total count of all expenses
+        pagination: false, // Indicate that pagination is not applied
+      });
+    }
+
+    // If pagination parameters are provided, return paginated data
+    const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+
+    const expenses = await Expenses.find(query)
+      .sort({ _id: -1 }) // Sort by creation date descending
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalExpenses = await Expenses.countDocuments(query); // Total count of expenses for the query
+
+    res.status(200).json({
+      data: expenses,
+      totalExpenses,
+      totalPages: Math.ceil(totalExpenses / limit), // Calculate total pages
+      currentPage: parseInt(page), // Current page
+      perPage: parseInt(limit), // Items per page
+      pagination: true, // Indicate that pagination is applied
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching expenses:", error.message);
     res.status(500).json({ error: 'Error fetching expenses' });
   }
 });
+
 
 router.get('/expenses/get/:_id', auth, async (req, res) => {
   try {
@@ -51,7 +80,7 @@ router.get('/expenses/get/:_id', auth, async (req, res) => {
           return res.status(400).json({ message: 'Expenses ID (_id) is required' });
       }
 
-      const expenses = await Expenses.findById(_id);
+      const expenses = await Expenses.findById(_id).populate('purchaseBy','name');
       
       if (!expenses) {
           return res.status(404).json({ message: 'Expenses not found' });

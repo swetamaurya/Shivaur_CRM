@@ -66,7 +66,8 @@ const userSchema = new mongoose.Schema({
   payslip: { type: String },
   leave:[{ type: mongoose.Schema.Types.ObjectId, ref: 'Leaves' }],
   attendance:[{ type: mongoose.Schema.Types.ObjectId, ref: 'Attendance' }],
-  // Primary Contact Information
+  Manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Manager field
+  Supervisor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Supe
   primaryContact: {
     name: { type: String },
     relationship: { type: String },

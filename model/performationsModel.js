@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const ResignationSchema = new mongoose.Schema({
    employee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-   department:{ type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
+    email : String,
    noticeDate: String, // Change to Date type
    resignationDate: String, // Change to Date type
    reason: String
@@ -14,7 +14,6 @@ const ResignationSchema = new mongoose.Schema({
 
 const TerminationSchema = new mongoose.Schema({
    employee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-   department:{ type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
    TerminationType: String,
    noticeDate: String, // Change to Date type
    terminationDate: String, // Change to Date type

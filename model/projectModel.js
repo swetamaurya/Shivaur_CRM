@@ -51,14 +51,14 @@ const projectSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 
   // History field to track changes
-  history: [
-    {
-      field: String,  
-      oldValue: mongoose.Schema.Types.Mixed,   
-      newValue: mongoose.Schema.Types.Mixed,  
-      changedAt: { type: Date, default: Date.now }   
-    }
-  ]
+  // history: [
+  //   {
+  //     field: String,  
+  //     oldValue: mongoose.Schema.Types.Mixed,   
+  //     newValue: mongoose.Schema.Types.Mixed,  
+  //     changedAt: { type: Date, default: Date.now }   
+  //   }
+  // ]
 });
 
 // Schema for Material Management

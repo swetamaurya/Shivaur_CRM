@@ -6,21 +6,48 @@ const { uploadFileToFirebase } = require('../utils/fireBase');
 const { auth } = require('../Middleware/authorization');
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Get all policies that the user is authorized to view
 router.get('/all', auth, async (req, res) => {
-  const { roles, id } = req.user;
-
   try {
-    // Adjust query to fetch policies based on user role or ownership
-    const query = roles === 'Admin' ? {} : { userId: id }; // Admins can view all, others only their own policies
+    const { roles, id } = req.user;
+    const { page, limit } = req.query;
+    const query = roles === 'Admin' ? {} : { userId: id };
 
-    const policies = await Policy.find(query).populate('department').sort({ createdAt: -1 });
-    res.status(200).json(policies);
+    if (!page || !limit) {
+      const policies = await Policy.find(query)
+        .populate('department')
+        .sort({ createdAt: -1 });
+
+      return res.status(200).json({
+        data: policies,
+        totalPolicies: policies.length,
+        pagination: false,
+      });
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const policies = await Policy.find(query)
+      .populate('department')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalPolicies = await Policy.countDocuments(query);
+
+    res.status(200).json({
+      data: policies,
+      totalPolicies,
+      totalPages: Math.ceil(totalPolicies / limit),
+      currentPage: parseInt(page),
+      perPage: parseInt(limit),
+      pagination: true,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch policies' });
+    console.error("Error fetching policies:", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // Get a specific policy by ID with authorization check
 router.get('/:id', auth, async (req, res) => {

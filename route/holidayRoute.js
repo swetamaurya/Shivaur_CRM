@@ -24,12 +24,42 @@ route.post('/holiday/post', auth, async (req, res) => {
 // Route to fetch all holidays (accessible to all authenticated users)
 route.get('/holiday/get', auth, async (req, res) => {
     try {
-        const getAllHolidays = await Holiday.find().sort({_id :-1});
-        res.status(200).send(getAllHolidays);
+      const { page, limit } = req.query; // Extract pagination parameters
+  
+      if (!page || !limit) {
+        // If pagination parameters are not provided, return all holidays
+        const holidays = await Holiday.find().sort({ _id: -1 }); // Sort by creation date descending
+        return res.status(200).json({
+          data: holidays,
+          totalHolidays: holidays.length, // Total count of all holidays
+          pagination: false, // Indicate that pagination is not applied
+        });
+      }
+  
+      // If pagination parameters are provided, return paginated data
+      const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+  
+      const holidays = await Holiday.find()
+        .sort({ _id: -1 }) // Sort by creation date descending
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      const totalHolidays = await Holiday.countDocuments(); // Total count of holidays
+  
+      res.status(200).json({
+        data: holidays,
+        totalHolidays,
+        totalPages: Math.ceil(totalHolidays / limit), // Calculate total pages
+        currentPage: parseInt(page), // Current page
+        perPage: parseInt(limit), // Items per page
+        pagination: true, // Indicate that pagination is applied
+      });
     } catch (error) {
-        res.status(500).send(error);
+      console.error("Error fetching holidays:", error.message);
+      res.status(500).json({ error: 'Error fetching holidays' });
     }
-});
+  });
+  
 
 // Route to update a holiday (Admins only)
 route.post('/holiday/update', auth, async (req, res) => {
@@ -87,58 +117,104 @@ await User.findByIdAndUpdate(req.user.id, { $push: { leave: addLeave._id } });
 
 route.get('/leaves/get', auth, async (req, res) => {
     try {
-        const { roles, id: userId } = req.user;
-        console.log("req.user:", req.user);
-
-        // Define the query based on role
-        let query = {};
-        if (roles === "Employee") {
-            query = { employee: userId };
-        }
-
-        // Fetch the leaves based on the query
+      const { roles, id: userId } = req.user; // Extract user roles and ID
+      const { page, limit } = req.query; // Extract pagination parameters
+  
+      // Define the query based on role
+      let query = {};
+      if (roles === "Employee") {
+        query = { employee: userId }; // Employees can only view their own leaves
+      }
+  
+      if (!page || !limit) {
+        // If pagination parameters are not provided, return all leave requests
         const leaves = await Leaves.find(query)
-            .populate('employee', 'name email')
-            .populate('approvedBy', 'name email')
-            .populate('leaveType', 'leaveName')
-            .sort({ createdAt: -1 });
-
+          .populate('employee', 'name email')
+          .populate('approvedBy', 'name email')
+          .populate('leaveType', 'leaveName')
+          .sort({ createdAt: -1 });
+  
         // Calculate leave summary
         const totalLeavesTaken = leaves.reduce((sum, leave) => sum + Number(leave.leavesTaken || 0), 0);
         const totalPendingRequests = leaves.filter(leave => leave.leaveStatus === 'Pending').length;
         const totalApprovedLeaves = leaves.filter(leave => leave.leaveStatus === 'Approved').length;
         const totalRejectedLeaves = leaves.filter(leave => leave.leaveStatus === 'Rejected').length;
-
         const totalAvailableLeaves = leaves.length > 0 ? Number(leaves[0].totalLeaves) : 0;
         const totalRemainingLeaves = totalAvailableLeaves - totalLeavesTaken;
-
+  
         // Calculate leave type counts
         const leaveTypeCounts = leaves.reduce((counts, leave) => {
-            const typeName = leave.leaveType?.leaveName || 'Other Leave';
-            counts[typeName] = (counts[typeName] || 0) + 1;
-            return counts;
+          const typeName = leave.leaveType?.leaveName || 'Other Leave';
+          counts[typeName] = (counts[typeName] || 0) + 1;
+          return counts;
         }, {});
-
-        res.status(200).json({
-            summary: {
-                totalLeavesTaken,
-                totalPendingRequests,
-                totalApprovedLeaves,
-                totalRejectedLeaves,
-                totalAvailableLeaves,
-                totalRemainingLeaves,
-            },
-            leaveTypeCounts,
-            leaves
+  
+        return res.status(200).json({
+          summary: {
+            totalLeavesTaken,
+            totalPendingRequests,
+            totalApprovedLeaves,
+            totalRejectedLeaves,
+            totalAvailableLeaves,
+            totalRemainingLeaves,
+            totalRecords: leaves.length,
+            pagination: false, // Indicate that pagination is not applied
+          },
+          leaveTypeCounts,
+          leaves,
         });
+      }
+  
+      // If pagination parameters are provided, return paginated data
+      const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+  
+      const totalLeaves = await Leaves.countDocuments(query); // Total count of leave requests
+      const leaves = await Leaves.find(query)
+        .populate('employee', 'name email')
+        .populate('approvedBy', 'name email')
+        .populate('leaveType', 'leaveName')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      // Calculate leave summary for paginated data
+      const totalLeavesTaken = leaves.reduce((sum, leave) => sum + Number(leave.leavesTaken || 0), 0);
+      const totalPendingRequests = leaves.filter(leave => leave.leaveStatus === 'Pending').length;
+      const totalApprovedLeaves = leaves.filter(leave => leave.leaveStatus === 'Approved').length;
+      const totalRejectedLeaves = leaves.filter(leave => leave.leaveStatus === 'Rejected').length;
+      const totalAvailableLeaves = leaves.length > 0 ? Number(leaves[0].totalLeaves) : 0;
+      const totalRemainingLeaves = totalAvailableLeaves - totalLeavesTaken;
+  
+      // Calculate leave type counts
+      const leaveTypeCounts = leaves.reduce((counts, leave) => {
+        const typeName = leave.leaveType?.leaveName || 'Other Leave';
+        counts[typeName] = (counts[typeName] || 0) + 1;
+        return counts;
+      }, {});
+  
+      res.status(200).json({
+        summary: {
+          totalLeavesTaken,
+          totalPendingRequests,
+          totalApprovedLeaves,
+          totalRejectedLeaves,
+          totalAvailableLeaves,
+          totalRemainingLeaves,
+          totalRecords: totalLeaves,
+          totalPages: Math.ceil(totalLeaves / limit),
+          currentPage: parseInt(page),
+          perPage: parseInt(limit),
+          pagination: true, // Indicate that pagination is applied
+        },
+        leaveTypeCounts,
+        leaves,
+      });
     } catch (error) {
-        console.error('Error fetching leaves:', error.message);
-        res.status(500).json({ error: 'Server error' });
+      console.error('Error fetching leaves:', error.message);
+      res.status(500).json({ error: 'Server error' });
     }
-});
-
-
-
+  });
+  
 
 
 
@@ -259,14 +335,42 @@ route.post('/leavesType/post', auth, async (req, res) => {
 
 route.get('/leavesType/get', auth, async (req, res) => {
     try {
-        const leaves = await LeaveType.find()
-
-        res.status(200).send(leaves);
+      const { page, limit } = req.query; // Extract pagination parameters
+  
+      if (!page || !limit) {
+        // If pagination parameters are not provided, return all leave types
+        const leaveTypes = await LeaveType.find().sort({ _id: -1 }); // Sort by creation date descending
+        return res.status(200).json({
+          data: leaveTypes,
+          totalLeaveTypes: leaveTypes.length, // Total count of all leave types
+          pagination: false, // Indicate that pagination is not applied
+        });
+      }
+  
+      // If pagination parameters are provided, return paginated data
+      const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+  
+      const leaveTypes = await LeaveType.find()
+        .sort({ _id: -1 }) // Sort by creation date descending
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      const totalLeaveTypes = await LeaveType.countDocuments(); // Total count of leave types
+  
+      res.status(200).json({
+        data: leaveTypes,
+        totalLeaveTypes,
+        totalPages: Math.ceil(totalLeaveTypes / limit), // Calculate total pages
+        currentPage: parseInt(page), // Current page
+        perPage: parseInt(limit), // Items per page
+        pagination: true, // Indicate that pagination is applied
+      });
     } catch (error) {
-        console.error('Error creating leave:', error.message);
-        res.status(500).json({ error: 'Server error' });
+      console.error('Error fetching leave types:', error.message);
+      res.status(500).json({ error: 'Server error' });
     }
-});
+  });
+  
 
 route.get('/leavesType/get/:id', auth, async (req, res) => {
     try {

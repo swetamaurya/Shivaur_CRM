@@ -6,7 +6,7 @@ const expensesSchema = new mongoose.Schema({
     item: { type: String  },
     expanseName: { type: String  },
     purchaseDate :{type: String},
-    purchaseBy :{type: String},
+    purchaseBy :{ type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     amount :{type: String},
     paidBy :{type: String},
     status: { type: String, default: 'Pending' },

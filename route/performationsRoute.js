@@ -10,9 +10,9 @@ router.post('/resignation/post', auth, async (req, res) => {
         
         const resignation = new Resignation({
             ...otherData,
-            noticeDate: new Date(noticeDate),
-            resignationDate: new Date(resignationDate),
-            employee: req.user._id  // Assign the logged-in user's ID to the employee field
+            noticeDate: noticeDate,
+            resignationDate:  resignationDate,
+            employee: req.user.id  // Assign the logged-in user's ID to the employee field
         });
 
         await resignation.save();
@@ -22,23 +22,48 @@ router.post('/resignation/post', auth, async (req, res) => {
     }
 });
 
-// Route to get all resignations (Admins only, otherwise only the user's own resignations)
 router.get('/resignation/getAll', auth, async (req, res) => {
-  try {
+    try {
       const { roles, _id: userId } = req.user;
-      let query = roles === 'Admin' ? {} : { employee: userId };
-
+      const { page, limit } = req.query;
+      const query = roles === 'Admin' ? {} : { employee: userId };
+  
+      if (!page || !limit) {
+        const resignations = await Resignation.find(query)
+          .populate('employee', 'name email')
+           .sort({ _id: -1 });
+  
+        return res.status(200).json({
+          data: resignations,
+          totalResignations: resignations.length,
+          pagination: false,
+        });
+      }
+  
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+  
       const resignations = await Resignation.find(query)
-          .populate('employee', 'name userId')
-          .populate('department', 'departments')
-          .sort({ _id: -1 });
-
-      res.status(200).json(resignations);
-  } catch (error) {
-      console.error("Error retrieving resignations:", error);
-      res.status(500).json({ message: 'Error retrieving resignations', error: error.message });
-  }
-});
+        .populate('employee', 'name email')
+         .sort({ _id: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      const totalResignations = await Resignation.countDocuments(query);
+  
+      res.status(200).json({
+        data: resignations,
+        totalResignations,
+        totalPages: Math.ceil(totalResignations / limit),
+        currentPage: parseInt(page),
+        perPage: parseInt(limit),
+        pagination: true,
+      });
+    } catch (error) {
+      console.error("Error retrieving resignations:", error.message);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
 
 // Route to get a specific resignation by ID
 router.get('/resignation/getSingle/:_id', auth, async (req, res) => {
@@ -46,13 +71,11 @@ router.get('/resignation/getSingle/:_id', auth, async (req, res) => {
         const { roles, _id: userId } = req.user;
         
         const resignation = await Resignation.findById(req.params._id)
-            .populate('employee', 'name userId');
+            .populate('employee', 'name email');
         
         if (!resignation) return res.status(404).json({ message: 'Resignation not found' });
 
-        if (roles !== 'Admin' && resignation.employee._id.toString() !== userId.toString()) {
-            return res.status(403).json({ message: 'Access denied: Unauthorized to view this resignation.' });
-        }
+      
 
         res.status(200).json(resignation);
     } catch (error) {
@@ -122,23 +145,49 @@ router.post('/termination/post', auth, async (req, res) => {
     }
 });
 
-// Route to get all terminations (Admins only, otherwise only the user's own terminations)
 router.get('/termination/getAll', auth, async (req, res) => {
-  try {
+    try {
       const { roles, _id: userId } = req.user;
-      let query = roles === 'Admin' ? {} : { employee: userId };
-
-      const terminations = await Termination.find(query)
+      console.log(req.user)
+      const { page, limit } = req.query;
+      const query = roles === 'Admin' ? {} : { employee: userId };
+  
+      if (!page || !limit) {
+        const terminations = await Termination.find(query)
           .populate('employee', 'name userId')
-          .populate('department', 'departments')
-          .sort({ _id: -1 });
-
-      res.status(200).json(terminations);
-  } catch (error) {
-      console.error("Error retrieving terminations:", error);
-      res.status(500).json({ message: 'Error retrieving terminations', error: error.message });
-  }
-});
+           .sort({ _id: -1 });
+  
+        return res.status(200).json({
+          data: terminations,
+          totalTerminations: terminations.length,
+          pagination: false,
+        });
+      }
+  
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+  
+      const terminations = await Termination.find(query)
+        .populate('employee', 'name userId')
+         .sort({ _id: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      const totalTerminations = await Termination.countDocuments(query);
+  
+      res.status(200).json({
+        data: terminations,
+        totalTerminations,
+        totalPages: Math.ceil(totalTerminations / limit),
+        currentPage: parseInt(page),
+        perPage: parseInt(limit),
+        pagination: true,
+      });
+    } catch (error) {
+      console.error("Error retrieving terminations:", error.message);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
 
 // Route to get a specific termination by ID
 router.get('/termination/getSingle/:_id', auth, async (req, res) => {
