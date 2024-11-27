@@ -125,15 +125,62 @@ route.get('/leaves/get', auth, async (req, res) => {
         query = { employee: userId }; // Employees can only view their own leaves
       }
   
+<<<<<<< HEAD
       const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
       const totalLeaves = await Leaves.countDocuments(query); // Total count of leave requests
   
       // Fetch all leaves based on the query with pagination and populate fields
+=======
+      if (!page || !limit) {
+        // If pagination parameters are not provided, return all leave requests
+        const leaves = await Leaves.find(query)
+          .populate('employee', 'name email')
+          .populate('approvedBy', 'name email')
+          .populate('leaveType', 'leaveName')
+          .sort({ createdAt: -1 });
+  
+        // Calculate leave summary
+        const totalLeavesTaken = leaves.reduce((sum, leave) => sum + Number(leave.leavesTaken || 0), 0);
+        const totalPendingRequests = leaves.filter(leave => leave.leaveStatus === 'Pending').length;
+        const totalApprovedLeaves = leaves.filter(leave => leave.leaveStatus === 'Approved').length;
+        const totalRejectedLeaves = leaves.filter(leave => leave.leaveStatus === 'Rejected').length;
+        const totalAvailableLeaves = leaves.length > 0 ? Number(leaves[0].totalLeaves) : 0;
+        const totalRemainingLeaves = totalAvailableLeaves - totalLeavesTaken;
+  
+        // Calculate leave type counts
+        const leaveTypeCounts = leaves.reduce((counts, leave) => {
+          const typeName = leave.leaveType?.leaveName || 'Other Leave';
+          counts[typeName] = (counts[typeName] || 0) + 1;
+          return counts;
+        }, {});
+  
+        return res.status(200).json({
+          summary: {
+            totalLeavesTaken,
+            totalPendingRequests,
+            totalApprovedLeaves,
+            totalRejectedLeaves,
+            totalAvailableLeaves,
+            totalRemainingLeaves,
+            totalRecords: leaves.length,
+            pagination: false, // Indicate that pagination is not applied
+          },
+          leaveTypeCounts,
+          leaves,
+        });
+      }
+  
+      // If pagination parameters are provided, return paginated data
+      const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+  
+      const totalLeaves = await Leaves.countDocuments(query); // Total count of leave requests
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       const leaves = await Leaves.find(query)
         .populate('employee', 'name email')
         .populate('approvedBy', 'name email')
         .populate('leaveType', 'leaveName')
         .sort({ createdAt: -1 })
+<<<<<<< HEAD
         .skip(page ? skip : 0)
         .limit(page ? parseInt(limit) : totalLeaves); // If no pagination, return all
   
@@ -163,6 +210,42 @@ route.get('/leaves/get', auth, async (req, res) => {
           pagination: !!page, // Indicate if pagination is applied
         },
         leaves, // Return all leave data in the response
+=======
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      // Calculate leave summary for paginated data
+      const totalLeavesTaken = leaves.reduce((sum, leave) => sum + Number(leave.leavesTaken || 0), 0);
+      const totalPendingRequests = leaves.filter(leave => leave.leaveStatus === 'Pending').length;
+      const totalApprovedLeaves = leaves.filter(leave => leave.leaveStatus === 'Approved').length;
+      const totalRejectedLeaves = leaves.filter(leave => leave.leaveStatus === 'Rejected').length;
+      const totalAvailableLeaves = leaves.length > 0 ? Number(leaves[0].totalLeaves) : 0;
+      const totalRemainingLeaves = totalAvailableLeaves - totalLeavesTaken;
+  
+      // Calculate leave type counts
+      const leaveTypeCounts = leaves.reduce((counts, leave) => {
+        const typeName = leave.leaveType?.leaveName || 'Other Leave';
+        counts[typeName] = (counts[typeName] || 0) + 1;
+        return counts;
+      }, {});
+  
+      res.status(200).json({
+        summary: {
+          totalLeavesTaken,
+          totalPendingRequests,
+          totalApprovedLeaves,
+          totalRejectedLeaves,
+          totalAvailableLeaves,
+          totalRemainingLeaves,
+          totalRecords: totalLeaves,
+          totalPages: Math.ceil(totalLeaves / limit),
+          currentPage: parseInt(page),
+          perPage: parseInt(limit),
+          pagination: true, // Indicate that pagination is applied
+        },
+        leaveTypeCounts,
+        leaves,
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       });
     } catch (error) {
       console.error('Error fetching leaves:', error.message);
@@ -170,8 +253,11 @@ route.get('/leaves/get', auth, async (req, res) => {
     }
   });
   
+<<<<<<< HEAD
 
   
+=======
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
 
 

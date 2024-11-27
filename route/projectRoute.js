@@ -55,49 +55,99 @@ route.get('/get', auth, async (req, res) => {
 
     if (!page || !limit) {
       // Fetch all projects if 'data=all' is specified
+<<<<<<< HEAD
       if (roles === 'Admin' || roles === 'HR' || roles === 'Manager') {
         // Admin and HR can see all projects
         projects = await Project.find()
           .populate("assignedTo", "name email userId")
           .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
       
+=======
+      if (roles === 'Admin' || roles === 'HR') {
+        // Admin and HR can see all projects
+        projects = await Project.find()
+          .populate("assignedTo", "name email userId")
+          .populate("clientName", "name email userId")
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
           .populate({
             path: "tasks",
             populate: [
               { path: "assignedTo", select: "name email userId" },
+<<<<<<< HEAD
               { path: "assignedBy", select: "name email userId" }
             ]
           }) 
           .sort({ _id: -1 }).exec();
       
+=======
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 });
+      } else if (roles === 'Manager') {
+        // Managers can see projects they manage
+        projects = await Project.find({ manager: id })
+          .populate("assignedTo", "name email userId")
+          .populate("clientName", "name email userId")
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 });
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       } else if (roles === 'Supervisor') {
         // Supervisors can see projects assigned to their team
         projects = await Project.find({ supervisor: id })
           .populate("assignedTo", "name email userId")
+<<<<<<< HEAD
           .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
       
+=======
+          .populate("clientName", "name email userId")
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
           .populate({
             path: "tasks",
             populate: [
               { path: "assignedTo", select: "name email userId" },
+<<<<<<< HEAD
               { path: "assignedBy", select: "name email userId" }
             ]
           }) 
           .sort({ _id: -1 }).exec();
+=======
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 });
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       } else {
         // Non-admin roles can only see projects assigned to them
         projects = await Project.find({ assignedTo: id })
           .populate("assignedTo", "name email userId")
+<<<<<<< HEAD
           .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
       
+=======
+          .populate("clientName", "name email userId")
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
           .populate({
             path: "tasks",
             populate: [
               { path: "assignedTo", select: "name email userId" },
+<<<<<<< HEAD
               { path: "assignedBy", select: "name email userId" }
             ]
           }) 
           .sort({ _id: -1 }).exec();
+=======
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 });
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       }
 
       res.status(200).json({
@@ -109,16 +159,25 @@ route.get('/get', auth, async (req, res) => {
       // Apply pagination if 'page' and 'limit' are provided
       const skip = (page - 1) * limit;
 
+<<<<<<< HEAD
       if (roles === 'Admin' || roles === 'HR' || roles === 'Manager') {
         // Admin and HR can see all projects
         projects = await Project.find()
           .populate("assignedTo", "name email userId")
           .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
       
+=======
+      if (roles === 'Admin' || roles === 'HR') {
+        // Admin and HR can see all projects
+        projects = await Project.find()
+          .populate("assignedTo", "name email userId")
+          .populate("clientName", "name email userId")
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
           .populate({
             path: "tasks",
             populate: [
               { path: "assignedTo", select: "name email userId" },
+<<<<<<< HEAD
               { path: "assignedBy", select: "name email userId" }
             ]
           }) 
@@ -133,34 +192,88 @@ route.get('/get', auth, async (req, res) => {
           .populate("assignedTo", "name email userId")
           .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
       
+=======
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(parseInt(limit));
+
+        totalProjects = await Project.countDocuments();
+      } else if (roles === 'Manager') {
+        // Managers can see projects they manage
+        projects = await Project.find({ manager: id })
+          .populate("assignedTo", "name email userId")
+          .populate("clientName", "name email userId")
           .populate({
             path: "tasks",
             populate: [
               { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(parseInt(limit));
+
+        totalProjects = await Project.countDocuments({ manager: id });
+      } else if (roles === 'Supervisor') {
+        // Supervisors can see projects assigned to their team
+        projects = await Project.find({ supervisor: id })
+          .populate("assignedTo", "name email userId")
+          .populate("clientName", "name email userId")
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+<<<<<<< HEAD
               { path: "assignedBy", select: "name email userId" }
             ]
           }) 
           .sort({ _id: -1 })
           .skip(skip)
           .limit(parseInt(limit)).exec();
+=======
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(parseInt(limit));
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
         totalProjects = await Project.countDocuments({ supervisor: id });
       } else {
         // Non-admin roles can only see projects assigned to them
         projects = await Project.find({ assignedTo: id })
           .populate("assignedTo", "name email userId")
+<<<<<<< HEAD
           .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
       
+=======
+          .populate("clientName", "name email userId")
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
           .populate({
             path: "tasks",
             populate: [
               { path: "assignedTo", select: "name email userId" },
+<<<<<<< HEAD
               { path: "assignedBy", select: "name email userId" }
             ]
           })
           .sort({ _id: -1 })
           .skip(skip)
           .limit(parseInt(limit)).exec();
+=======
+              { path: "assignedBy", select: "name email userId" },
+            ],
+          })
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(parseInt(limit));
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
         totalProjects = await Project.countDocuments({ assignedTo: id });
       }

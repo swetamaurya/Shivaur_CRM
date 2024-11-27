@@ -40,7 +40,11 @@ router.get('/expenses/get', auth, async (req, res) => {
 
     if (!page || !limit) {
       // If pagination parameters are not provided, return all data
+<<<<<<< HEAD
       const expenses = await Expenses.find(query).populate('purchaseBy','name userId').sort({ _id: -1 }); // Sort by creation date descending
+=======
+      const expenses = await Expenses.find(query).populate('purchaseBy','name').sort({ _id: -1 }); // Sort by creation date descending
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       return res.status(200).json({
         data: expenses,
         totalExpenses: expenses.length, // Total count of all expenses
@@ -51,7 +55,11 @@ router.get('/expenses/get', auth, async (req, res) => {
     // If pagination parameters are provided, return paginated data
     const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
 
+<<<<<<< HEAD
     const expenses = await Expenses.find(query).populate('purchaseBy','name userId')
+=======
+    const expenses = await Expenses.find(query)
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       .sort({ _id: -1 }) // Sort by creation date descending
       .skip(skip)
       .limit(parseInt(limit));
@@ -80,7 +88,11 @@ router.get('/expenses/get/:_id', auth, async (req, res) => {
           return res.status(400).json({ message: 'Expenses ID (_id) is required' });
       }
 
+<<<<<<< HEAD
       const expenses = await Expenses.findById(_id).populate('purchaseBy','name userId');
+=======
+      const expenses = await Expenses.findById(_id).populate('purchaseBy','name');
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       
       if (!expenses) {
           return res.status(404).json({ message: 'Expenses not found' });

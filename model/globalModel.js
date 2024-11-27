@@ -32,6 +32,7 @@ const models = {
     resignation: Resignation,
   };
   
+<<<<<<< HEAD
    
   // Population configuration for all models
 const populationConfig = {
@@ -105,6 +106,13 @@ const getPopulationRules = (modelName) => populationConfig[modelName.toLowerCase
   // Export both models and the function
   module.exports = {
     getPopulationRules,
+=======
+  const getModelByName = (modelName) => models[modelName.toLowerCase()] || null;
+  
+  // Export both models and the function
+  module.exports = {
+ 
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
     getModelByName
   };
   

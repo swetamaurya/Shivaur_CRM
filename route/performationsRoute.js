@@ -23,6 +23,7 @@ router.post('/resignation/post', auth, async (req, res) => {
 });
 
 router.get('/resignation/getAll', auth, async (req, res) => {
+<<<<<<< HEAD
   try {
     const { roles, _id: userId } = req.user;
     const { page, limit } = req.query;
@@ -68,6 +69,49 @@ router.get('/resignation/getAll', auth, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+=======
+    try {
+      const { roles, _id: userId } = req.user;
+      const { page, limit } = req.query;
+      const query = roles === 'Admin' ? {} : { employee: userId };
+  
+      if (!page || !limit) {
+        const resignations = await Resignation.find(query)
+          .populate('employee', 'name email')
+           .sort({ _id: -1 });
+  
+        return res.status(200).json({
+          data: resignations,
+          totalResignations: resignations.length,
+          pagination: false,
+        });
+      }
+  
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+  
+      const resignations = await Resignation.find(query)
+        .populate('employee', 'name email')
+         .sort({ _id: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      const totalResignations = await Resignation.countDocuments(query);
+  
+      res.status(200).json({
+        data: resignations,
+        totalResignations,
+        totalPages: Math.ceil(totalResignations / limit),
+        currentPage: parseInt(page),
+        perPage: parseInt(limit),
+        pagination: true,
+      });
+    } catch (error) {
+      console.error("Error retrieving resignations:", error.message);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
   
 
@@ -201,6 +245,7 @@ router.post('/termination/post', auth, async (req, res) => {
 });
 
 router.get('/termination/getAll', auth, async (req, res) => {
+<<<<<<< HEAD
   try {
     const { roles, _id: userId } = req.user; // Extract user roles and ID
     const { page, limit } = req.query;
@@ -249,6 +294,50 @@ router.get('/termination/getAll', auth, async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+=======
+    try {
+      const { roles, _id: userId } = req.user;
+      console.log(req.user)
+      const { page, limit } = req.query;
+      const query = roles === 'Admin' ? {} : { employee: userId };
+  
+      if (!page || !limit) {
+        const terminations = await Termination.find(query)
+          .populate('employee', 'name userId')
+           .sort({ _id: -1 });
+  
+        return res.status(200).json({
+          data: terminations,
+          totalTerminations: terminations.length,
+          pagination: false,
+        });
+      }
+  
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+  
+      const terminations = await Termination.find(query)
+        .populate('employee', 'name userId')
+         .sort({ _id: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      const totalTerminations = await Termination.countDocuments(query);
+  
+      res.status(200).json({
+        data: terminations,
+        totalTerminations,
+        totalPages: Math.ceil(totalTerminations / limit),
+        currentPage: parseInt(page),
+        perPage: parseInt(limit),
+        pagination: true,
+      });
+    } catch (error) {
+      console.error("Error retrieving terminations:", error.message);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
   
 

@@ -16,7 +16,10 @@ const ResignationSchema = new mongoose.Schema({
 
 const TerminationSchema = new mongoose.Schema({
    employee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+<<<<<<< HEAD
    email:String,
+=======
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
    TerminationType: String,
  
    terminationDate: String, // Change to Date type

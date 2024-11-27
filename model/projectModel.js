@@ -48,7 +48,20 @@ const projectSchema = new mongoose.Schema({
 
    createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+<<<<<<< HEAD
  
+=======
+
+  // History field to track changes
+  // history: [
+  //   {
+  //     field: String,  
+  //     oldValue: mongoose.Schema.Types.Mixed,   
+  //     newValue: mongoose.Schema.Types.Mixed,  
+  //     changedAt: { type: Date, default: Date.now }   
+  //   }
+  // ]
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 });
 
 // Schema for Material Management

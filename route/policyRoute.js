@@ -8,6 +8,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.get('/all', auth, async (req, res) => {
   try {
+<<<<<<< HEAD
     const { roles, id } = req.user; // Extract user roles and ID
     const { page, limit } = req.query;
 
@@ -22,6 +23,16 @@ router.get('/all', auth, async (req, res) => {
         .populate('department', 'departments') // Populate department details
         // .populate('userId', 'name email') // Populate user details
         .sort({ createdAt: -1 }); // Sort by creation date (descending)
+=======
+    const { roles, id } = req.user;
+    const { page, limit } = req.query;
+    const query = roles === 'Admin' ? {} : { userId: id };
+
+    if (!page || !limit) {
+      const policies = await Policy.find(query)
+        .populate('department')
+        .sort({ createdAt: -1 });
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
       return res.status(200).json({
         data: policies,
@@ -30,6 +41,7 @@ router.get('/all', auth, async (req, res) => {
       });
     }
 
+<<<<<<< HEAD
     // Apply pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -37,6 +49,13 @@ router.get('/all', auth, async (req, res) => {
       .populate('department', 'departments') // Populate department details
       // .populate('userId', 'name email') // Populate user details
       .sort({ createdAt: -1 }) // Sort by creation date (descending)
+=======
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const policies = await Policy.find(query)
+      .populate('department')
+      .sort({ createdAt: -1 })
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       .skip(skip)
       .limit(parseInt(limit));
 
@@ -57,8 +76,11 @@ router.get('/all', auth, async (req, res) => {
 });
 
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 // Get a specific policy by ID with authorization check
 router.get('/:id', auth, async (req, res) => {
   const { roles, id: userId } = req.user;

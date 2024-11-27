@@ -86,6 +86,7 @@ router.post("/attendance/punch", auth, async (req, res) => {
 
 router.get("/attendance/get", auth, async (req, res) => {
   try {
+<<<<<<< HEAD
     const { roles, id: userId } = req.user; // Extract roles and user ID
     const { page, limit } = req.query; // Pagination parameters
 
@@ -128,6 +129,45 @@ router.get("/attendance/get", auth, async (req, res) => {
         const workMinutes = totalWorkMinutes % 60;
         const totalWorkHoursDisplay = `${workHours} hrs ${workMinutes} mins`;
 
+=======
+    const { roles, id: userId } = req.user;
+    const { page, limit } = req.query; // Pagination parameters
+    const query = roles === 'Admin' ? {} : { userId }; // Admin sees all, others see their own
+
+    let attendanceRecords;
+    let totalRecords;
+
+    if (!page || !limit) {
+      // No pagination provided, return all records
+      attendanceRecords = await Attendance.find(query).populate("userId");
+      totalRecords = attendanceRecords.length;
+    } else {
+      // Apply pagination
+      totalRecords = await Attendance.countDocuments(query);
+      attendanceRecords = await Attendance.find(query)
+        .populate("userId")
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .limit(parseInt(limit));
+    }
+
+    res.status(200).json({
+      message: "Attendance records fetched successfully",
+      totalRecords,
+      totalPages: page && limit ? Math.ceil(totalRecords / parseInt(limit)) : 1,
+      currentPage: page ? parseInt(page) : 1,
+      attendanceRecords: attendanceRecords.map(record => {
+        const latestWorkSession = record.workSessions[record.workSessions.length - 1] || {};
+        const punchIn = latestWorkSession.punchIn || null;
+        const punchOut = latestWorkSession.punchOut || null;
+
+        const totalWorkMinutes = record.totalWorkHours || 0;
+        const totalBreakMinutes = record.totalBreakHours || 0;
+
+        const workHours = Math.floor(totalWorkMinutes / 60);
+        const workMinutes = totalWorkMinutes % 60;
+        const totalWorkHoursDisplay = `${workHours} hrs ${workMinutes} mins`;
+
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
         const breakHours = Math.floor(totalBreakMinutes / 60);
         const breakMinutes = totalBreakMinutes % 60;
         const totalBreakHoursDisplay = `${breakHours} hrs ${breakMinutes} mins`;
@@ -153,7 +193,10 @@ router.get("/attendance/get", auth, async (req, res) => {
 
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 // Route to get attendance for a specific employee by userId (Admins and specific employee) with pagination
 router.get("/attendance/user/:userId", auth, async (req, res) => {
   const { userId } = req.params;
@@ -193,11 +236,16 @@ router.get("/attendance/user/:userId", auth, async (req, res) => {
 
 
 router.get('/attendance/today', auth, async (req, res) => {
+<<<<<<< HEAD
   const { roles, _id: userId, name } = req.user; // Extract role and user ID from the authenticated user
+=======
+  const { roles, _id: userId } = req.user; // Extract role and user ID from the authenticated user
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
   const currentDate = new Date().toISOString().split("T")[0];
   const { page, limit } = req.query; // Pagination parameters
 
   try {
+<<<<<<< HEAD
     // Roles with full access
     const fullAccessRoles = ['Admin', 'Manager', 'HR'];
 
@@ -210,6 +258,13 @@ router.get('/attendance/today', auth, async (req, res) => {
       const allEmployees = await User.find(employeeQuery)
         .select("_id name role");
 
+=======
+    if (roles === 'Admin') {
+      // Admin: Fetch attendance for all employees
+      const allEmployees = await User.find({ roles: { $in: ["Employee", "Supervisor"] } })
+        .select("_id name role");
+
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       const totalEmployees = allEmployees.length;
 
       let employeesToProcess = allEmployees;
@@ -275,14 +330,22 @@ router.get('/attendance/today', auth, async (req, res) => {
 
       const attendanceStatus = attendanceRecord ? {
         userId,
+<<<<<<< HEAD
         name: name,
+=======
+        name: req.user.name,
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
         date: currentDate,
         punchIn: attendanceRecord.workSessions[0]?.punchIn || null,
         punchOut: attendanceRecord.workSessions[0]?.punchOut || null,
         status: attendanceRecord.status || "Absent"
       } : {
         userId,
+<<<<<<< HEAD
         name: name,
+=======
+        name: req.user.name,
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
         date: currentDate,
         punchIn: null,
         punchOut: null,
@@ -303,6 +366,15 @@ router.get('/attendance/today', auth, async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
+=======
+
+
+
+router.get('/attendance/monthYear/get', auth, async (req, res) => {
+  const { month, year, page = 1, limit = 10 } = req.query;
+  const { roles, _id: userId } = req.user; // Extract role and user ID from the authenticated user
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
 
 
@@ -322,6 +394,7 @@ router.get('/attendance/monthYear/get', auth, async (req, res) => {
 
     let query = {};
     let totalEmployees = 0;
+<<<<<<< HEAD
 
     // Role-based query setup
     switch (roles) {
@@ -368,6 +441,26 @@ router.get('/attendance/monthYear/get', auth, async (req, res) => {
             $lte: endOfMonth.toISOString().split("T")[0],
           },
         },
+=======
+
+    if (roles === 'Admin') {
+      // Admin: Fetch all employees
+      const allEmployees = await User.find({ roles: "Employee" });
+      totalEmployees = allEmployees.length;
+      query = { users: allEmployees.slice((page - 1) * limit, page * limit) };
+    } else {
+      // Employee: Fetch only their data
+      query = { _id: userId };
+      totalEmployees = 1;
+    }
+
+    const attendanceRecords = await Attendance.aggregate([
+      {
+        $match: {
+          date: { $gte: startOfMonth.toISOString().split("T")[0], $lte: endOfMonth.toISOString().split("T")[0] },
+          ...(roles === 'Admin' ? {} : { userId }),
+        }
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       },
       {
         $group: {
@@ -380,6 +473,7 @@ router.get('/attendance/monthYear/get', auth, async (req, res) => {
           },
         },
       },
+<<<<<<< HEAD
     ]);
 
     // Format attendance records
@@ -494,6 +588,146 @@ router.get("/attendance/status", auth, async (req, res) => {
 
     // Format the attendance data
     const formattedRecords = users.map((user) => {
+=======
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'userInfo'
+        }
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          userId: "$_id",
+          name: "$userInfo.name",
+          attendance: 1
+        }
+      }
+    ]).populate("userId");
+
+    const formattedRecords = query.users.map(user => {
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
+      const attendance = {};
+      // Initialize all days as "Absent"
+      for (let day = 1; day <= endOfMonth.getDate(); day++) {
+        const dayString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        attendance[dayString] = "Absent";
+      }
+
+      // Populate attendance records
+      const userRecord = attendanceRecords.find((record) => String(record.userId) === String(user._id));
+      if (userRecord) {
+        userRecord.attendance.forEach((day) => {
+          attendance[day.date] = day.status || "Absent";
+        });
+      }
+
+      return {
+        userId: user._id,
+        name: user.name,
+        attendance,
+      };
+    });
+
+<<<<<<< HEAD
+    // Build the response
+    res.status(200).json({
+      message: "Attendance status fetched successfully",
+      totalRecords: totalUsers,
+      totalPages: page && limit ? Math.ceil(totalUsers / parseInt(limit)) : 1,
+      currentPage: page ? parseInt(page) : 1,
+      attendanceStatus: formattedRecords,
+=======
+    res.status(200).json({
+      attendanceRecords: formattedRecords,
+      totalRecords: totalEmployees,
+      totalPages: Math.ceil(totalEmployees / limit),
+      currentPage: parseInt(page),
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
+    });
+  } catch (error) {
+    console.error("Error fetching attendance records:", error.message);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
+
+
+<<<<<<< HEAD
+=======
+
+router.get("/attendance/status", auth, async (req, res) => {
+  const { month, year, page, limit } = req.query;
+  const { roles, _id: userId } = req.user; // Extract role and user ID from the authenticated user
+
+  if (!month || !year || isNaN(month) || isNaN(year) || month < 1 || month > 12) {
+    return res.status(400).json({ message: "Valid month (1-12) and year are required." });
+  }
+
+  try {
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0);
+
+    let usersQuery = roles === "Admin" ? {} : { _id: userId };
+    let totalUsers = await User.countDocuments(usersQuery);
+    let users = [];
+
+    // Fetch all users or paginated users based on `page` and `limit`
+    if (!page || !limit) {
+      // If no pagination, fetch all users
+      users = await User.find(usersQuery).select("_id name");
+    } else {
+      // If pagination is provided, fetch paginated users
+      users = await User.find(usersQuery)
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .limit(parseInt(limit))
+        .select("_id name");
+    }
+
+    // Fetch attendance records for the specified month
+    const attendanceRecords = await Attendance.aggregate([
+      {
+        $match: {
+          date: {
+            $gte: startOfMonth.toISOString().split("T")[0],
+            $lte: endOfMonth.toISOString().split("T")[0],
+          },
+          ...(roles === "Admin" ? {} : { userId }),
+        },
+      },
+      {
+        $group: {
+          _id: "$userId",
+          attendance: {
+            $push: {
+              date: "$date",
+              status: "$status",
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "userInfo",
+        },
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          userId: "$_id",
+          name: "$userInfo.name",
+          attendance: 1,
+        },
+      },
+    ]);
+
+    // Format the attendance data
+    const formattedRecords = users.map((user) => {
       const attendance = {};
       // Initialize all days as "Absent"
       for (let day = 1; day <= endOfMonth.getDate(); day++) {
@@ -532,6 +766,7 @@ router.get("/attendance/status", auth, async (req, res) => {
 
 
 
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 module.exports = router;
 
 

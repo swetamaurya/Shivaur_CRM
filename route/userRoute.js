@@ -259,19 +259,19 @@ route.post('/resetPassword', auth, async (req, res) => {
  
 route.get('/data/get', auth, async (req, res) => {
   try {
-    const { roles, id } = req.user; // Extract roles and user ID from authenticated user
-    const { page, limit } = req.query; // Extract pagination parameters
+    const { roles, id } = req.user; // Extract the roles and id from the authenticated user
+    // console.log("req.user", req.user);
 
-    const skip = page && limit ? (parseInt(page) - 1) * parseInt(limit) : 0;
-    const limitValue = limit ? parseInt(limit) : null;
+    // Get page and limit from query parameters or set default values
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    let users = {};
-    let totalEmployees = 0;
-    let totalClients = 0;
+    let users;
 
-    if (roles === "Admin" || roles === "HR" || roles === "Manager") {
-      // Admin, HR, and Manager can see all data
-      const employees = await User.find({ roles: { $in: ["Employee", "Supervisor", "Manager"] } })
+    if (roles === "Admin") {
+      // Fetch employees with assigned project details populated
+      const employees = await User.find({ roles: { $in: ["Employee", "Supervisor"] } })
         .populate("assigned", "projectName projectId")
         .populate("leave")
         .populate("attendance")
@@ -279,53 +279,61 @@ route.get('/data/get', auth, async (req, res) => {
         .populate("designations", "designations")
         .sort({ _id: -1 })
         .skip(skip)
-        .limit(limitValue);
+        .limit(limit);
 
       const clients = await User.find({ roles: "Client" })
         .populate("assigned", "projectName projectId")
         .sort({ _id: -1 })
         .skip(skip)
-        .limit(limitValue);
-
-      totalEmployees = await User.countDocuments({ roles: { $in: ["Employee", "Supervisor", "Manager"] } });
-      totalClients = await User.countDocuments({ roles: "Client" });
+        .limit(limit);
 
       users = { employees, clients };
-    } else if (roles === "Employee") {
-      // Employee can only see their own data
-      const employee = await User.findOne({ _id: id })
-        .populate("assigned", "projectName projectId")
-        .populate("leave", "totalLeaves")
-        .populate("attendance")
-        .populate("departments", "departments")
-        .populate("designations", "designations");
 
+    } 
+    
+     else if (roles === "Employee") {
+      // Fetch employee's assigned projects based on user ID
+      const employee = await User.find({ _id: id })
+        .populate("assigned", "projectName projectId")
+        .populate("clientName", "name userId")
+        .populate("leave"  ,"totalLeaves")
+        .populate("attendance")
+        .sort({ _id: -1 });
+ 
       users = { employee };
-      totalEmployees = 1;
+
+    } else if (roles === "Supervisor") {
+      // Fetch employees managed by the supervisor
+      const employees = await User.find({ roles: "Employee" })
+      .populate("assigned", "projectName projectId")
+      .populate("clientName", "name userId")
+      .populate('leave')
+      .populate("attendance")        .sort({ _id: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const clients = await User.find({ roles: "Client" })
+        .sort({ _id: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      users = { employees, clients };
+
     } else {
-      // For any other roles, deny access
-      return res.status(403).json({ message: "Access denied: Unrecognized role." });
+      return res.status(403).send('Access denied: roles not recognized.');
     }
 
     res.status(200).json({
       users,
       totalEmployees,
-      totalClients,
-      totalPagesEmployees: limitValue ? Math.ceil(totalEmployees / limitValue) : 1,
-      totalPagesClients: limitValue ? Math.ceil(totalClients / limitValue) : 1,
-      currentPage: page ? parseInt(page) : 1,
-      perPage: limitValue,
-      pagination: Boolean(page && limit), // Indicate if pagination is applied
+      currentPage: page,
     });
+
   } catch (error) {
     console.error(`Error fetching users: ${error.message}`);
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
-
-
-
 
 
 

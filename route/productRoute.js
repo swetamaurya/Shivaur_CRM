@@ -14,6 +14,7 @@ route.get('/get', auth, async (req, res) => {
   try {
     const { roles } = req.user;
     const { page, limit } = req.query;
+<<<<<<< HEAD
 
     // Roles with full access
     const fullAccessRoles = ['Admin', 'Manager', 'HR'];
@@ -45,14 +46,41 @@ route.get('/get', auth, async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     products = await Product.find()
+=======
+
+    if (roles !== 'Admin') {
+      return res.status(403).json({ message: "Unauthorized access for this role." });
+    }
+
+    if (!page || !limit) {
+      const products = await Product.find()
+        .populate("category", "category")
+        .sort({ _id: -1 });
+
+      return res.status(200).json({
+        data: products,
+        totalProducts: products.length,
+        pagination: false,
+      });
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const products = await Product.find()
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       .populate("category", "category")
       .sort({ _id: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
+<<<<<<< HEAD
     totalProducts = await Product.countDocuments();
 
     // Return paginated data
+=======
+    const totalProducts = await Product.countDocuments();
+
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
     res.status(200).json({
       data: products,
       totalProducts,
@@ -69,7 +97,10 @@ route.get('/get', auth, async (req, res) => {
 
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 // GET a single product by ID
 route.get('/get/:_id', auth, async (req, res) => {
   try {
@@ -253,7 +284,11 @@ route.get('/categories/get', auth, async (req, res) => {
     const { page, limit } = req.query;
 
     if (!page || !limit) {
+<<<<<<< HEAD
       const categories = await Category.find({}, "category") 
+=======
+      const categories = await Category.find({}, "category").exec()
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
         .sort({ _id: -1 });
 
       return res.status(200).json({

@@ -13,8 +13,12 @@ const { Department, Designation } = require("../model/departmentModel");
  const  Expenses   = require('../model/expensesModel');
  const { Termination, Resignation } = require("../model/performationsModel");
  const ExcelJS = require("exceljs")
+<<<<<<< HEAD
  const { getModelByName, getPopulationRules } = require('../model/globalModel');
  const moment = require('moment');
+=======
+ const { getModelByName } = require('../model/globalModel');
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
 route.post("/delete/all", auth, async (req, res) => {
   try {
@@ -131,7 +135,11 @@ route.post("/export", auth, async (req, res) => {
           });
       } else if (name === "Estimate") {
         query = query
+<<<<<<< HEAD
           .populate("client", "name email userId address") // Include all relevant client fields
+=======
+          .populate("client", "name email clientId address") // Include all relevant client fields
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
           .populate("project", "projectName projectId") // Include all relevant project fields
           .select("estimatesId client estimateDate project email taxType expiryDate status clientAddress billingAddress total tax discount GrandTotal otherInfo details"); // Explicitly select all required fields
       
@@ -147,10 +155,14 @@ route.post("/export", auth, async (req, res) => {
           ); // Explicitly select all required fields
       }else if (name === "User") {
         query = query
+<<<<<<< HEAD
         .populate("assigned", "name email userId")
         .populate("designations", "designations")
         .populate("departments", "departments"); // Populate only the department name
         ; // Populate only the department name
+=======
+        .populate("assigned", "name email userId");
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
       } else if (name === "Task") {
         query = query
@@ -196,7 +208,11 @@ const generateExcelFile = async (res, data) => {
     const flatObject = {};
 
     for (const [key, value] of Object.entries(entry)) {
+<<<<<<< HEAD
       if (["_id", "password", "image", "__v" ].includes(key)) {
+=======
+      if (["_id", "password", "image", "__v"].includes(key)) {
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
         continue; // Skip unnecessary fields
       }
 
@@ -204,8 +220,12 @@ const generateExcelFile = async (res, data) => {
         flatObject[`${key}_Name`] = value?.name || "-";
         flatObject[`${key}_Email`] = value?.email || "-";
         flatObject[`${key}_UserId`] = value?.userId || "-";
+<<<<<<< HEAD
       } 
       else if (key === "tasks") {
+=======
+      } else if (key === "tasks") {
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
         flatObject[key] =
           Array.isArray(value) && value.length > 0
             ? value.map((task) => `${task.name} (${task.status})`).join(", ")
@@ -214,17 +234,25 @@ const generateExcelFile = async (res, data) => {
         if (Array.isArray(value)) {
           value.forEach((detail, index) => {
             Object.entries(detail).forEach(([detailKey, detailValue]) => {
+<<<<<<< HEAD
               if (detailKey !== "_id") { // Exclude `_id` from details
                 flatObject[`Detail_${index + 1}_${detailKey}`] = detailValue || "-";
               }
+=======
+              flatObject[`Detail_${index + 1}_${detailKey}`] = detailValue || "-";
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
             });
           });
         } else {
           flatObject[key] = "-";
         }
+<<<<<<< HEAD
       }
       
       else if (key === "purchaseBy") {
+=======
+      } else if (key === "purchaseBy") {
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
         flatObject["Purchased_By_Name"] = value?.name || "-";
         flatObject["Purchased_By_Email"] = value?.email || "-";
         flatObject["Purchased_By_UserId"] = value?.userId || "-";
@@ -255,14 +283,24 @@ const generateExcelFile = async (res, data) => {
         flatObject["Departments"] = value?.departments || value || "-";
       } 
       else if (key === "designations") {
+<<<<<<< HEAD
         flatObject["Designations"] = value?.designations || value || "-";
+=======
+        flatObject["Designations"] = value || "-";
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       } 
       else if (key === "termination") {
         flatObject["Termination"] = value || "-";
       } 
+<<<<<<< HEAD
       else if (key === "assignedTo") {
         flatObject["assignedTo"] = value?.name || "-";
       } 
+=======
+      // else if (key === "resignation") {
+      //   flatObject["Resignation"] = value || "-";
+      // } 
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
       else if (typeof value === "object" && value !== null) {
         for (const [nestedKey, nestedValue] of Object.entries(value)) {
           flatObject[`${key}_${nestedKey}`] = nestedValue || "-";
@@ -309,7 +347,78 @@ const generateExcelFile = async (res, data) => {
  
  
 
+// const flattenData = (entry) => {
+//   const flatObject = {};
 
+<<<<<<< HEAD
+=======
+//   for (const [key, value] of Object.entries(entry)) {
+//     if (["_id", "password", "image", "__v"].includes(key)) {
+//       continue; // Skip unnecessary fields
+//     }
+
+//     if (Buffer.isBuffer(value)) {
+//       // Decode buffer data into a human-readable string
+//       flatObject[key] = value.toString("utf-8");
+//     } else if (typeof value === "object" && value !== null) {
+//       // Handle nested objects
+//       for (const [nestedKey, nestedValue] of Object.entries(value)) {
+//         flatObject[`${key}_${nestedKey}`] = Buffer.isBuffer(nestedValue)
+//           ? nestedValue.toString("utf-8")
+//           : nestedValue || "-";
+//       }
+//     } else if (Array.isArray(value)) {
+//       // Handle arrays
+//       flatObject[key] = value.join(", ") || "-";
+//     } else {
+//       flatObject[key] = value || "-";
+//     }
+//   }
+
+//   return flatObject;
+// };
+
+// const formatHeader = (header) =>
+//   header
+//     .replace(/_/g, " ")
+//     .toLowerCase()
+//     .replace(/^\w|\s\w/g, (char) => char.toUpperCase());
+
+
+// const generateExcelFile = async (res, data) => {
+//   const workbook = new ExcelJS.Workbook();
+
+//   for (const [modelName, modelData] of Object.entries(data)) {
+//     const worksheet = workbook.addWorksheet(modelName);
+
+//     const flatData = modelData.map((item) => flattenData(item.toObject()));
+
+//     worksheet.columns = Object.keys(flatData[0] || {}).map((key) => ({
+//       header: formatHeader(key),
+//       key: key,
+//       width: 20,
+//     }));
+
+//     flatData.forEach((item) => worksheet.addRow(item));
+
+//     worksheet.addRow({});
+//     worksheet.addRow({ Total_Records: flatData.length });
+//   }
+
+//   res.setHeader(
+//     "Content-Type",
+//     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+//   );
+//   res.setHeader("Content-Disposition", 'attachment; filename="exported-data.xlsx"');
+
+//   await workbook.xlsx.write(res);
+//   res.end();
+// };
+
+
+
+
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 
 
 async function buildDynamicQuery(searchParams) {
@@ -317,6 +426,7 @@ async function buildDynamicQuery(searchParams) {
 
   for (const [key, value] of Object.entries(searchParams)) {
     if (value) {
+<<<<<<< HEAD
       // Handle nested fields, e.g., `employee.name`
       const path = key.includes('.') ? key : key;
       query[path] = { $regex: value, $options: 'i' }; // Case-insensitive regex for all keys
@@ -352,11 +462,54 @@ const applyRoleBasedRestrictions = async (query, roles, currentUserId) => {
 
     default:
       throw new Error('Access denied: invalid role');
+=======
+      query[key] = { $regex: value, $options: 'i' }; // Case-insensitive regex for all keys
+    }
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
   }
 
   return query;
+}
+
+
+// Role-based restrictions
+const applyRoleBasedRestrictions = async (query, roles, currentUserId) => {
+  if (roles === "Admin") {
+    return query; // Admin has full access
+  } else if (roles === "Employee") {
+    const assignedProjects = await getAssignedProjectsOrClients(currentUserId);
+    query._id = { $in: assignedProjects };
+  } else if (roles === "Supervisor") {
+    const managedEmployees = await getManagedEmployees(currentUserId);
+    query._id = { $in: managedEmployees };
+  } else if (roles === "Manager") {
+    const managedData = await getEmployeesOrProjectsManaged(currentUserId);
+    query._id = { $in: managedData };
+  } else if (roles === "HR") {
+    query.roles = { $in: ["Employee", "Supervisor", "Manager"] };
+  }
+  return query;
 };
 
+// Fetch assigned projects or clients for an employee
+const getAssignedProjectsOrClients = async (employeeId) => {
+  const assignments = await User.find({ _id: employeeId }).select("assigned");
+  return assignments.flatMap((assignment) => assignment.assigned);
+};
+
+// Fetch employees managed by a supervisor
+const getManagedEmployees = async (supervisorId) => {
+  const employees = await User.find({ supervisorId }).select("_id");
+  return employees.map((employee) => employee._id);
+};
+
+// Fetch employees or projects managed by a manager
+const getEmployeesOrProjectsManaged = async (managerId) => {
+  const assignments = await User.find({ managerId }).select("assigned");
+  return assignments.map((assignment) => assignment.assigned);
+};
+
+<<<<<<< HEAD
 
 // Apply dynamic query and role-based restrictions in the global search route
 route.get('/global-search', auth, async (req, res) => {
@@ -364,6 +517,13 @@ route.get('/global-search', auth, async (req, res) => {
   const skip = (page - 1) * limit;
   const { id: currentUserId, roles } = req.user;
 
+=======
+route.get('/global-search', auth, async (req, res) => {
+  const { type, page = 1, limit = 10, sort = 'createdAt', order = 'asc', ...searchParams } = req.query;
+  const skip = (page - 1) * limit;
+  const { id: currentUserId, roles } = req.user;
+
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
   const model = getModelByName(type); // Dynamically fetch the model based on the type
 
   if (!model) {
@@ -377,6 +537,7 @@ route.get('/global-search', auth, async (req, res) => {
     // 2. Apply role-based restrictions
     query = await applyRoleBasedRestrictions(query, roles, currentUserId);
 
+<<<<<<< HEAD
     // 3. Get the population rules for the model
     const populationRules = getPopulationRules(type);
 
@@ -396,6 +557,78 @@ route.get('/global-search', auth, async (req, res) => {
     const totalPages = Math.ceil(totalCount / limit);
 
     // 6. Send response
+=======
+    console.log('Query Data:', query);
+
+    // 3. Build the query with find()
+    // let queryBuilder = model.find(query);
+     // 4. Apply conditional population based on the `type`
+    // if (type === 'resignation') {
+    //   queryBuilder = queryBuilder.populate({
+    //     path: 'employee',
+    //     select: 'name userId email', // Fields to include for employee
+    //   });
+    // }else if (type === 'termination') {
+    //   queryBuilder = queryBuilder.populate({
+    //     path: 'employee',
+    //     select: 'name userId email', // Fields to include for employee
+    //   });
+    // }else if (type === 'project') {
+    //   queryBuilder = queryBuilder
+    //     .populate({
+    //       path: 'clientName',
+    //       match: searchParams['clientName.name'] // Match by client name if provided
+    //         ? { name: { $regex: searchParams['clientName.name'], $options: 'i' } }
+    //         : undefined, // Only apply if `clientName.name` exists
+    //       select: 'name userId email', // Fields to include for client
+    //     })
+    //     .populate({
+    //       path: 'assignedTo',
+    //       select: 'name userId email', // Fields to include for assigned user
+    //     });
+    
+    // } else if (type === 'otherType') {
+    //   queryBuilder = queryBuilder.populate({
+    //     path: 'project',
+    //     select: 'projectName projectId', // Fields to include for project
+    //   });
+    // }
+
+    // 5. Apply sorting, pagination, and execute the query
+    // const results = await queryBuilder
+    //   .sort({ [sort]: order === 'desc' ? -1 : 1 })
+    //   .skip(skip)
+    //   .limit(parseInt(limit));
+    // Fetch all data with population
+    let results = await model
+      .find(query)
+      .populate({
+        path: 'clientName',
+        select: 'name userId email', // Fields to include for client
+      })
+      .populate({
+        path: 'assignedTo',
+        select: 'name userId email', // Fields to include for assigned user
+      })
+      .sort({ [sort]: order === 'desc' ? -1 : 1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Filter the populated data in JavaScript
+    if (searchParams['clientName.name']) {
+      results = results.filter((result) =>
+        result.clientName?.name
+          ?.toLowerCase()
+          .includes(searchParams['clientName.name'].toLowerCase())
+      );
+    }
+ 
+    // 6. Fetch total count
+    const totalCount = await model.countDocuments(query);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // 7. Send response
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
     res.status(200).json({
       data: results,
       message: 'Search results fetched successfully!',
@@ -415,6 +648,11 @@ route.get('/global-search', auth, async (req, res) => {
 
 
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 3b70b594ca05c177dc1c42b0908a69db9e73870f
 //Admin Dashboard
 
 
