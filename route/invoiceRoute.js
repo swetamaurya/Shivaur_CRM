@@ -17,14 +17,50 @@ route.post('/invoice/post', auth, async (req, res) => {
 
 
 // Read (GET) - Fetch all invoices
-route.get('/invoice/get',auth, async (req, res) => {
+route.get('/invoice/get', auth, async (req, res) => {
     try {
-        const invoices = await Invoice.find().sort({ _id: -1 });
-        res.status(200).send(invoices);
+      const { page, limit } = req.query; // Extract pagination parameters
+  
+      if (!page || !limit) {
+        // If pagination parameters are not provided, return all invoices
+        const invoices = await Invoice.find()
+          .populate('client' ) // Populate client details
+          .populate('project' ) // Populate project details
+          .sort({ _id: -1 }); // Sort by creation date descending
+  
+        return res.status(200).json({
+          data: invoices,
+          totalInvoices: invoices.length, // Total count of all invoices
+          pagination: false, // Indicate that pagination is not applied
+        });
+      }
+  
+      // If pagination parameters are provided, return paginated data
+      const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+  
+      const invoices = await Invoice.find()
+        .populate('client' ) // Populate client details
+        .populate('project' ) // Populate project details
+        .sort({ _id: -1 }) // Sort by creation date descending
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      const totalInvoices = await Invoice.countDocuments(); // Total count of invoices
+  
+      res.status(200).json({
+        data: invoices,
+        totalInvoices,
+        totalPages: Math.ceil(totalInvoices / limit), // Calculate total pages
+        currentPage: parseInt(page), // Current page
+        perPage: parseInt(limit), // Items per page
+        pagination: true, // Indicate that pagination is applied
+      });
     } catch (error) {
-        res.status(500).send(error);
+      console.error('Error fetching invoices:', error.message);
+      res.status(500).json({ error: 'Server error' });
     }
-});
+  });
+  
 
 route.get('/invoice/get/:_id', auth, async (req, res) => {
     try {
@@ -33,7 +69,7 @@ route.get('/invoice/get/:_id', auth, async (req, res) => {
             return res.status(400).json({ message: 'Invoice ID (_id) is required' });
         }
 
-        const invoice = await Invoice.findById(_id);
+        const invoice = await Invoice.findById(_id).populate('client').populate('project');
         
         if (!invoice) {
             return res.status(404).json({ message: 'Invoice not found' });
@@ -105,15 +141,52 @@ route.post('/estimates/post',auth, async (req, res) => {
 });
 
 
-// Get all estimates
-route.get('/estimates/get',auth, async (req, res) => {
+route.get('/estimates/get', auth, async (req, res) => {
     try {
-        const estimates = await Estimate.find();
-        res.status(200).json(estimates);
+        const page = parseInt(req.query.page); // Page number from query
+        const limit = parseInt(req.query.limit); // Limit from query
+
+        // Check if pagination is provided
+        if (!page || !limit) {
+            // No pagination, send all data
+            const estimates = await Estimate.find()
+            .populate('client' ) // Populate client details
+            .populate('project' ) // Populate project details
+                    .sort({ _id: -1 }); // Sort by _id in descending order
+
+            res.status(200).json({
+                data: estimates,
+                totalEstimates: estimates.length,  
+                pagination: false  
+            });
+        } else {
+             const skip = (page - 1) * limit; // Calculate number of documents to skip
+
+            const estimates = await Estimate.find()
+            .populate('client') // Populate client details
+            .populate('project' ) // Populate project details
+                    .sort({ _id: -1 })
+                .skip(skip)
+                .limit(limit);
+
+            const totalEstimates = await Estimate.countDocuments();
+
+            res.status(200).json({
+                data: estimates,
+                totalEstimates,
+                totalPages: Math.ceil(totalEstimates / limit),
+                currentPage: page,
+                perPage: limit,
+                pagination: true // Indicate that pagination is applied
+            });
+        }
     } catch (error) {
+        console.error("Error fetching estimates:", error.message);
         res.status(500).json({ message: 'Error fetching estimates', error: error.message });
     }
 });
+
+
 
 
 route.get('/estimates/get/:_id', auth, async (req, res) => {
@@ -123,7 +196,9 @@ route.get('/estimates/get/:_id', auth, async (req, res) => {
             return res.status(400).json({ message: 'Estimate ID (_id) is required' });
         }
 
-        const estimate = await Estimate.findById(_id);
+        const estimate = await Estimate.findById(_id)        .populate('client' ) // Populate client details
+        .populate('project' ) // Populate project details
+
         
         if (!estimate) {
             return res.status(404).json({ message: 'Estimate not found' });

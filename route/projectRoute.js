@@ -18,14 +18,15 @@ route.get('/get/:id', auth, async (req, res) => {
 
     const project = await Project.findById(id)
       .populate("assignedTo", "name email userId")
-      .populate("clientName", "name email userId")
+      .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
+      
       .populate({
         path: "tasks",
         populate: [
           { path: "assignedTo", select: "name email userId" },
           { path: "assignedBy", select: "name email userId" }
         ]
-      });
+      }).exec();
 
     if (!project) 
       return res.status(404).json({ message: 'Project not found' });
@@ -46,63 +47,142 @@ route.get('/get/:id', auth, async (req, res) => {
 
 route.get('/get', auth, async (req, res) => {
   try {
-    const { id, roles } = req.user;
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const { id, roles } = req.user; // Extract user details from the request
+    const { page, limit,   } = req.query; // Extract pagination and data query parameters
 
     let projects;
     let totalProjects;
 
-    if (roles === 'Admin') {
-      // Admin can see all projects
-      projects = await Project.find()
-        .populate("assignedTo", "name email userId")
-        .populate("clientName", "name email userId")
-        .populate({
-          path: "tasks", // Change "task" to "tasks" to match the schema field
-          populate: [
-            { path: "assignedTo", select: "name email userId" },
-            { path: "assignedBy", select: "name email userId" }
-          ]
-        })
-        .sort({ _id: -1 })
-        .skip(skip)
-        .limit(parseInt(limit));
-
-      totalProjects = await Project.countDocuments();
-
-    } else {
-      // Non-admins can only see projects assigned to them
-      projects = await Project.find({ assignedTo: id })
-        .populate("assignedTo", "name email userId")
-        .populate("clientName", "name email userId")
-        .populate({
-          path: "tasks", // Change "task" to "tasks"
-          populate: [
-            { path: "assignedTo", select: "name email userId" },
-            { path: "assignedBy", select: "name email userId" }
-          ]
-        })
-        .sort({ _id: -1 })
-        .skip(skip)
-        .limit(parseInt(limit));
+    if (!page || !limit) {
+      // Fetch all projects if 'data=all' is specified
+      if (roles === 'Admin' || roles === 'HR' || roles === 'Manager') {
+        // Admin and HR can see all projects
+        projects = await Project.find()
+          .populate("assignedTo", "name email userId")
+          .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
       
-      console.log(projects);
-      totalProjects = await Project.countDocuments({ assignedTo: id });
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" }
+            ]
+          }) 
+          .sort({ _id: -1 }).exec();
+      
+      } else if (roles === 'Supervisor') {
+        // Supervisors can see projects assigned to their team
+        projects = await Project.find({ supervisor: id })
+          .populate("assignedTo", "name email userId")
+          .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
+      
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" }
+            ]
+          }) 
+          .sort({ _id: -1 }).exec();
+      } else {
+        // Non-admin roles can only see projects assigned to them
+        projects = await Project.find({ assignedTo: id })
+          .populate("assignedTo", "name email userId")
+          .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
+      
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" }
+            ]
+          }) 
+          .sort({ _id: -1 }).exec();
+      }
+
+      res.status(200).json({
+        data: projects,
+        totalProjects: projects.length,
+        pagination: false, // Indicate that pagination is not applied
+      });
+    } else if (page && limit) {
+      // Apply pagination if 'page' and 'limit' are provided
+      const skip = (page - 1) * limit;
+
+      if (roles === 'Admin' || roles === 'HR' || roles === 'Manager') {
+        // Admin and HR can see all projects
+        projects = await Project.find()
+          .populate("assignedTo", "name email userId")
+          .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
+      
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" }
+            ]
+          }) 
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)).exec();
+
+        totalProjects = await Project.countDocuments();
+       } else if (roles === 'Supervisor') {
+        // Supervisors can see projects assigned to their team
+        projects = await Project.find({ supervisor: id })
+          .populate("assignedTo", "name email userId")
+          .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
+      
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" }
+            ]
+          }) 
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)).exec();
+
+        totalProjects = await Project.countDocuments({ supervisor: id });
+      } else {
+        // Non-admin roles can only see projects assigned to them
+        projects = await Project.find({ assignedTo: id })
+          .populate("assignedTo", "name email userId")
+          .populate({ path: 'clientName', select: 'name userId email' }) // Populate clientName with required fields
+      
+          .populate({
+            path: "tasks",
+            populate: [
+              { path: "assignedTo", select: "name email userId" },
+              { path: "assignedBy", select: "name email userId" }
+            ]
+          })
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)).exec();
+
+        totalProjects = await Project.countDocuments({ assignedTo: id });
+      }
+
+      res.status(200).json({
+        data: projects,
+        totalProjects,
+        totalPages: Math.ceil(totalProjects / limit),
+        currentPage: parseInt(page),
+        perPage: parseInt(limit),
+        pagination: true, // Indicate that pagination is applied
+      });
+    } else {
+      // Missing or invalid query parameters
+      res.status(400).json({ message: 'Invalid request. Provide either "data=all" or "page" and "limit".' });
     }
-
-    res.status(200).json({
-      projects,
-      totalPages: Math.ceil(totalProjects / limit),
-      currentPage: parseInt(page),
-      totalProjects,
-    });
-
   } catch (error) {
     console.error(`Error fetching projects: ${error.message}`);
-    res.status(500).send(`Internal server error: ${error.message}`);
+    res.status(500).json({ message: `Internal server error: ${error.message}` });
   }
 });
+
 
 
  
@@ -229,66 +309,66 @@ route.post('/assign', auth, async (req, res) => {
 });
 
 
-route.get("/export", auth, async (req, res) => {
-  try {
-    const { page = 1, limit = 10, name, id, startDate, endDate } = req.query; // Extract search parameters and pagination
-    const skip = (page - 1) * limit;
-    const filterQuery = {};
+// route.get("/export", auth, async (req, res) => {
+//   try {
+//     const { page = 1, limit = 10, name, id, startDate, endDate } = req.query; // Extract search parameters and pagination
+//     const skip = (page - 1) * limit;
+//     const filterQuery = {};
 
-    // Search filters
-    if (name) {
-      filterQuery.name = { $regex: new RegExp(name, 'i') }; // Case-insensitive search by project name
-    }
+//     // Search filters
+//     if (name) {
+//       filterQuery.name = { $regex: new RegExp(name, 'i') }; // Case-insensitive search by project name
+//     }
 
-    // Check if the ID is a single value or multiple IDs (comma-separated string)
-    if (id) {
-      if (Array.isArray(id)) {
-        // If multiple IDs are passed as an array
-        filterQuery._id = { $in: id };
-      } else if (id.includes(',')) {
-        // If multiple IDs are passed as a comma-separated string
-        const idArray = id.split(',').map((i) => i.trim());
-        filterQuery._id = { $in: idArray };
-      } else {
-        // If a single ID is passed
-        filterQuery._id = id;
-      }
-    }
+//     // Check if the ID is a single value or multiple IDs (comma-separated string)
+//     if (id) {
+//       if (Array.isArray(id)) {
+//         // If multiple IDs are passed as an array
+//         filterQuery._id = { $in: id };
+//       } else if (id.includes(',')) {
+//         // If multiple IDs are passed as a comma-separated string
+//         const idArray = id.split(',').map((i) => i.trim());
+//         filterQuery._id = { $in: idArray };
+//       } else {
+//         // If a single ID is passed
+//         filterQuery._id = id;
+//       }
+//     }
 
-    // Search by date range (startDate and endDate)
-    if (startDate || endDate) {
-      filterQuery.createdAt = {};
-      if (startDate) {
-        filterQuery.createdAt.$gte = new Date(startDate); // Projects from startDate onwards
-      }
-      if (endDate) {
-        filterQuery.createdAt.$lte = new Date(endDate); // Projects until endDate
-      }
-    }
+//     // Search by date range (startDate and endDate)
+//     if (startDate || endDate) {
+//       filterQuery.createdAt = {};
+//       if (startDate) {
+//         filterQuery.createdAt.$gte = new Date(startDate); // Projects from startDate onwards
+//       }
+//       if (endDate) {
+//         filterQuery.createdAt.$lte = new Date(endDate); // Projects until endDate
+//       }
+//     }
 
-    // Fetch projects based on search criteria with pagination
-    const projects = await Project.find(filterQuery)
-      .populate("assignedTo", "name email")
-      .populate("clientName", "name email")
-      .sort({ _id: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+//     // Fetch projects based on search criteria with pagination
+//     const projects = await Project.find(filterQuery)
+//       .populate("assignedTo", "name email")
+//       .populate("clientName", "name email")
+//       .sort({ _id: -1 })
+//       .skip(skip)
+//       .limit(parseInt(limit));
 
-    // Count total projects matching the search criteria
-    const totalProjects = await Project.countDocuments(filterQuery);
+//     // Count total projects matching the search criteria
+//     const totalProjects = await Project.countDocuments(filterQuery);
 
-    res.status(200).json({
-      message: "Search results fetched successfully!",
-      projects,
-      totalPages: Math.ceil(totalProjects / limit),
-      currentPage: parseInt(page),
-      totalProjects,
-    });
-  } catch (error) {
-    console.error("Error exporting projects:", error);
-    return res.status(500).send(`Internal server error: ${error.message}`);
-  }
-});
+//     res.status(200).json({
+//       message: "Search results fetched successfully!",
+//       projects,
+//       totalPages: Math.ceil(totalProjects / limit),
+//       currentPage: parseInt(page),
+//       totalProjects,
+//     });
+//   } catch (error) {
+//     console.error("Error exporting projects:", error);
+//     return res.status(500).send(`Internal server error: ${error.message}`);
+//   }
+// });
 
  // Delete a single file within a project
 route.post('/deleteFile', auth, async (req, res) => {

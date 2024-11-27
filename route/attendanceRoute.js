@@ -84,59 +84,81 @@ router.post("/attendance/punch", auth, async (req, res) => {
 });
 
 
-// Fetch attendance records endpoint
 router.get("/attendance/get", auth, async (req, res) => {
   try {
-      const { roles, id: userId } = req.user;
-      const query = roles === 'Admin' ? {} : { userId };
+    const { roles, id: userId } = req.user; // Extract roles and user ID
+    const { page, limit } = req.query; // Pagination parameters
 
-      const attendanceRecords = await Attendance.find(query);
+    // Roles with full access
+    const fullAccessRoles = ['Admin', 'Manager', 'HR'];
 
-      res.status(200).json({
-          message: "Attendance records fetched successfully",
-          attendanceRecords: attendanceRecords.map(record => {
-              const latestWorkSession = record.workSessions[record.workSessions.length - 1] || {};
-              const punchIn = latestWorkSession.punchIn || null;
-              const punchOut = latestWorkSession.punchOut || null;
+    // Query logic based on roles
+    const query = fullAccessRoles.includes(roles) ? {} : { userId }; // Full access roles see all, others see their own
 
-              // Calculate and format total work and break hours from minutes
-              const totalWorkMinutes = record.totalWorkHours;
-              const totalBreakMinutes = record.totalBreakHours;
+    let attendanceRecords;
+    let totalRecords;
 
-              const workHours = Math.floor(totalWorkMinutes / 60);
-              const workMinutes = totalWorkMinutes % 60;
-              const totalWorkHoursDisplay = `${workHours} hrs ${workMinutes} mins`;
+    if (!page || !limit) {
+      // No pagination provided, return all records
+      attendanceRecords = await Attendance.find(query).populate("userId", "name email userId");
+      totalRecords = attendanceRecords.length;
+    } else {
+      // Apply pagination
+      totalRecords = await Attendance.countDocuments(query);
+      attendanceRecords = await Attendance.find(query)
+        .populate("userId", "name email userId")
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .limit(parseInt(limit));
+    }
 
-              const breakHours = Math.floor(totalBreakMinutes / 60);
-              const breakMinutes = totalBreakMinutes % 60;
-              const totalBreakHoursDisplay = `${breakHours} hrs ${breakMinutes} mins`;
+    res.status(200).json({
+      message: "Attendance records fetched successfully",
+      totalRecords,
+      totalPages: page && limit ? Math.ceil(totalRecords / parseInt(limit)) : 1,
+      currentPage: page ? parseInt(page) : 1,
+      attendanceRecords: attendanceRecords.map(record => {
+        const latestWorkSession = record.workSessions[record.workSessions.length - 1] || {};
+        const punchIn = latestWorkSession.punchIn || null;
+        const punchOut = latestWorkSession.punchOut || null;
 
-              return {
-                  date: record.date,
-                  punchIn,
-                  punchOut,
-                  workSessions: record.workSessions,  // Include all work sessions
-                  breakSessions: record.breakSessions,  // Include all break sessions
-                  totalWorkHours: totalWorkHoursDisplay,
-                  totalBreakHours: totalBreakHoursDisplay,
-                  status: record.status,
-              };
-          })
-      });
+        const totalWorkMinutes = record.totalWorkHours || 0;
+        const totalBreakMinutes = record.totalBreakHours || 0;
+
+        const workHours = Math.floor(totalWorkMinutes / 60);
+        const workMinutes = totalWorkMinutes % 60;
+        const totalWorkHoursDisplay = `${workHours} hrs ${workMinutes} mins`;
+
+        const breakHours = Math.floor(totalBreakMinutes / 60);
+        const breakMinutes = totalBreakMinutes % 60;
+        const totalBreakHoursDisplay = `${breakHours} hrs ${breakMinutes} mins`;
+
+        return {
+          date: record.date,
+          punchIn,
+          punchOut,
+          workSessions: record.workSessions,
+          breakSessions: record.breakSessions,
+          totalWorkHours: totalWorkHoursDisplay,
+          totalBreakHours: totalBreakHoursDisplay,
+          status: record.status,
+        };
+      }),
+    });
   } catch (error) {
-      console.error("Error fetching attendance records:", error.message);
-      res.status(500).json({ error: "Internal Server Error", details: error.message });
+    console.error("Error fetching attendance records:", error.message);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
 
 
 
 
-// Route to get attendance for a specific employee by userId (Admins and specific employee)
+
+// Route to get attendance for a specific employee by userId (Admins and specific employee) with pagination
 router.get("/attendance/user/:userId", auth, async (req, res) => {
   const { userId } = req.params;
   const { roles, _id: requesterId } = req.user;
-  const { month, year } = req.query;
+  const { month, year, page = 1, limit = 10 } = req.query;
 
   if (roles !== 'Admin' && requesterId !== userId) {
     return res.status(403).json({ message: "Access denied." });
@@ -150,95 +172,202 @@ router.get("/attendance/user/:userId", auth, async (req, res) => {
       filter.date = { $gte: startOfMonth.toISOString().split("T")[0], $lte: endOfMonth.toISOString().split("T")[0] };
     }
 
-    const attendanceRecords = await Attendance.find(filter).sort({ date: 1 });
-    res.status(200).json({ attendanceRecords });
+    const totalRecords = await Attendance.countDocuments(filter);
+    const attendanceRecords = await Attendance.find(filter).populate("userId")
+      .sort({ date: 1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      message: "Attendance records fetched successfully",
+      totalRecords,
+      totalPages: Math.ceil(totalRecords / limit),
+      currentPage: parseInt(page),
+      attendanceRecords,
+    });
   } catch (error) {
     console.error("Error fetching attendance data for user:", error.message);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
 
-// Route to get today's attendance for all employees (Admins only)
-router.get('/attendance/today', auth, async (req, res) => {
-  if (req.user.roles !== 'Admin') {
-    return res.status(403).json({ message: 'Access denied.' });
-  }
 
+router.get('/attendance/today', auth, async (req, res) => {
+  const { roles, _id: userId, name } = req.user; // Extract role and user ID from the authenticated user
   const currentDate = new Date().toISOString().split("T")[0];
+  const { page, limit } = req.query; // Pagination parameters
 
   try {
-    const allEmployees = await User.find({ roles: { $in: ["Employee", "Supervisor"] } }).select("_id name role");
+    // Roles with full access
+    const fullAccessRoles = ['Admin', 'Manager', 'HR'];
 
-    const attendanceRecords = await Attendance.aggregate([
-      { $match: { date: currentDate } },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'userInfo'
-        }
-      },
-      { $unwind: '$userInfo' },
-      {
-        $project: {
-          userId: 1,
-          date: 1,
-          status: 1,
-          punchIn: { $arrayElemAt: ['$workSessions.punchIn', 0] },
-          punchOut: { $arrayElemAt: ['$workSessions.punchOut', 0] },
-          name: '$userInfo.name',
-          role: '$userInfo.role'
-        }
+    if (fullAccessRoles.includes(roles)) {
+      // Fetch all employees relevant to the role
+      const employeeQuery = roles === 'Admin'
+        ? { roles: { $in: ["Employee", "Supervisor"] } }
+        : { manager: userId, roles: { $in: ["Employee", "Supervisor"] } };
+
+      const allEmployees = await User.find(employeeQuery)
+        .select("_id name role");
+
+      const totalEmployees = allEmployees.length;
+
+      let employeesToProcess = allEmployees;
+
+      if (page && limit) {
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        employeesToProcess = allEmployees.slice(skip, skip + parseInt(limit));
       }
-    ]);
 
-    const attendanceStatus = allEmployees.map(employee => {
-      const attendanceRecord = attendanceRecords.find(record => String(record.userId) === String(employee._id));
-      return attendanceRecord ? {
-        userId: employee._id,
-        name: employee.name,
+      const attendanceRecords = await Attendance.aggregate([
+        { $match: { date: currentDate } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'userInfo'
+          }
+        },
+        { $unwind: '$userInfo' },
+        {
+          $project: {
+            userId: 1,
+            date: 1,
+            status: 1,
+            punchIn: { $arrayElemAt: ['$workSessions.punchIn', 0] },
+            punchOut: { $arrayElemAt: ['$workSessions.punchOut', 0] },
+            name: '$userInfo.name',
+            role: '$userInfo.role'
+          }
+        }
+      ]);
+
+      const attendanceStatus = employeesToProcess.map(employee => {
+        const attendanceRecord = attendanceRecords.find(record => String(record.userId) === String(employee._id));
+        return attendanceRecord ? {
+          userId: employee._id,
+          name: employee.name,
+          date: currentDate,
+          punchIn: attendanceRecord.punchIn,
+          punchOut: attendanceRecord.punchOut,
+          status: "Present"
+        } : {
+          userId: employee._id,
+          name: employee.name,
+          date: currentDate,
+          punchIn: null,
+          punchOut: null,
+          status: "Absent"
+        };
+      });
+
+      res.status(200).json({
+        message: "Today's attendance status fetched successfully",
+        attendanceStatus,
+        totalRecords: totalEmployees,
+        totalPages: page && limit ? Math.ceil(totalEmployees / parseInt(limit)) : 1,
+        currentPage: page ? parseInt(page) : 1,
+      });
+    } else {
+      // Employee: Fetch only their own attendance data
+      const attendanceRecord = await Attendance.findOne({ userId, date: currentDate });
+
+      const attendanceStatus = attendanceRecord ? {
+        userId,
+        name: name,
         date: currentDate,
-        punchIn: attendanceRecord.punchIn,
-        punchOut: attendanceRecord.punchOut,
-        status: "Present"
+        punchIn: attendanceRecord.workSessions[0]?.punchIn || null,
+        punchOut: attendanceRecord.workSessions[0]?.punchOut || null,
+        status: attendanceRecord.status || "Absent"
       } : {
-        userId: employee._id,
-        name: employee.name,
+        userId,
+        name: name,
         date: currentDate,
         punchIn: null,
         punchOut: null,
         status: "Absent"
       };
-    });
 
-    res.status(200).json({ message: "Today's attendance status fetched successfully", attendanceStatus });
+      res.status(200).json({
+        message: "Your attendance status fetched successfully",
+        attendanceStatus: [attendanceStatus], // Return as an array for consistency
+        totalRecords: 1,
+        totalPages: 1,
+        currentPage: 1,
+      });
+    }
   } catch (error) {
     console.error("Error fetching today's attendance:", error.message);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
 
-router.get('/attendance/monthYear/get', auth, async (req, res) => {
-  const { month, year } = req.query;
 
-  if (!month || !year || isNaN(month) || isNaN(year) || month < 1 || month > 12) {
-    return res.status(400).json({ message: "Valid month (1-12) and year are required." });
-  }
+
+
+
+router.get('/attendance/monthYear/get', auth, async (req, res) => {
+  const { month, year, page = 1, limit = 10, employee } = req.query;
+  const { roles, _id: userId } = req.user; // Extract role and user ID from the authenticated user
 
   try {
+    // Validate month and year
+    if (!month || !year || isNaN(month) || isNaN(year) || month < 1 || month > 12) {
+      return res.status(400).json({ message: "Valid month (1-12) and year are required." });
+    }
+
     const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0); // Last day of the month
+    const endOfMonth = new Date(year, month, 0);
 
-    // Get all employees
-    const allEmployees = await User.find({ roles: "Employee" });
+    let query = {};
+    let totalEmployees = 0;
 
-    // Get attendance records for the selected month
+    // Role-based query setup
+    switch (roles) {
+      case 'Admin':
+      case 'HR':
+        // Admin and HR: Fetch all employees or search by employee name
+        query = employee
+          ? { roles: "Employee", name: { $regex: employee, $options: "i" } }
+          : { roles: "Employee" };
+        break;
+
+      case 'Manager':
+        // Manager: Fetch employees assigned to them
+        query = employee
+          ? { Manager: userId, name: { $regex: employee, $options: "i" } }
+          : { Manager: userId };
+        break;
+
+      case 'Supervisor':
+        // Supervisor: Fetch employees supervised by them
+        query = employee
+          ? { Supervisor: userId, name: { $regex: employee, $options: "i" } }
+          : { Supervisor: userId };
+        break;
+
+      default:
+        // Employee: Only fetch their own attendance
+        query = { _id: userId };
+        totalEmployees = 1;
+    }
+
+    // Fetch employee data
+    const users = await User.find(query)
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    totalEmployees = roles === 'Employee' ? 1 : await User.countDocuments(query);
+
+    // Aggregate attendance data for the specified month and year
     const attendanceRecords = await Attendance.aggregate([
       {
         $match: {
-          date: { $gte: startOfMonth.toISOString().split("T")[0], $lte: endOfMonth.toISOString().split("T")[0] }
-        }
+          date: {
+            $gte: startOfMonth.toISOString().split("T")[0],
+            $lte: endOfMonth.toISOString().split("T")[0],
+          },
+        },
       },
       {
         $group: {
@@ -246,62 +375,44 @@ router.get('/attendance/monthYear/get', auth, async (req, res) => {
           attendance: {
             $push: {
               date: "$date",
-              status: "$status"
-            }
-          }
-        }
+              status: "$status",
+            },
+          },
+        },
       },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'userInfo'
-        }
-      },
-      { $unwind: "$userInfo" },
-      {
-        $project: {
-          userId: "$_id",
-          name: "$userInfo.name",
-          attendance: 1
-        }
-      }
     ]);
 
-    // Prepare formatted records with default "Absent" for missing dates
-    const formattedRecords = allEmployees.map(employee => {
-      const dates = [];
-      const statuses = [];
-
-      // Populate dates with default "Absent" status for each day of the month
+    // Format attendance records
+    const formattedRecords = users.map((user) => {
+      // Initialize all dates in the month as "Absent"
+      const attendance = {};
       for (let day = 1; day <= endOfMonth.getDate(); day++) {
         const dayString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        dates.push(dayString);
-        statuses.push("Absent"); // Default to "Absent"
+        attendance[dayString] = "Absent";
       }
 
-      // Find the employee's attendance record for the month
-      const employeeRecord = attendanceRecords.find(record => record.userId.equals(employee._id));
-      if (employeeRecord) {
-        // Update the default "Absent" status with actual attendance data
-        employeeRecord.attendance.forEach(day => {
-          const index = dates.indexOf(day.date);
-          if (index !== -1) {
-            statuses[index] = day.status || "Absent";
-          }
+      // Find attendance for the current user
+      const userRecord = attendanceRecords.find((record) => record._id.toString() === user._id.toString());
+      if (userRecord) {
+        userRecord.attendance.forEach((day) => {
+          attendance[day.date] = day.status || "Absent";
         });
       }
 
       return {
-        userId: employee._id,
-        name: employee.name,
-        dates,
-        statuses
+        userId: user._id,
+        name: user.name,
+        attendance,
       };
     });
 
-    res.status(200).json({ attendanceRecords: formattedRecords });
+    // Send response
+    res.status(200).json({
+      attendanceRecords: formattedRecords,
+      totalRecords: totalEmployees,
+      totalPages: Math.ceil(totalEmployees / limit),
+      currentPage: parseInt(page),
+    });
   } catch (error) {
     console.error("Error fetching attendance records:", error.message);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
@@ -309,9 +420,13 @@ router.get('/attendance/monthYear/get', auth, async (req, res) => {
 });
 
 
-// Route to get monthly attendance status for all users
+
+
+
+
 router.get("/attendance/status", auth, async (req, res) => {
-  const { month, year } = req.query;
+  const { month, year, page, limit } = req.query;
+  const { roles, _id: userId } = req.user; // Extract role and user ID from the authenticated user
 
   if (!month || !year || isNaN(month) || isNaN(year) || month < 1 || month > 12) {
     return res.status(400).json({ message: "Valid month (1-12) and year are required." });
@@ -321,16 +436,32 @@ router.get("/attendance/status", auth, async (req, res) => {
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0);
 
-    const allUsers = await User.find();
+    let usersQuery = roles === "Admin" ? {} : { _id: userId };
+    let totalUsers = await User.countDocuments(usersQuery);
+    let users = [];
 
+    // Fetch all users or paginated users based on `page` and `limit`
+    if (!page || !limit) {
+      // If no pagination, fetch all users
+      users = await User.find(usersQuery).select("_id name");
+    } else {
+      // If pagination is provided, fetch paginated users
+      users = await User.find(usersQuery)
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .limit(parseInt(limit))
+        .select("_id name");
+    }
+
+    // Fetch attendance records for the specified month
     const attendanceRecords = await Attendance.aggregate([
       {
         $match: {
           date: {
             $gte: startOfMonth.toISOString().split("T")[0],
-            $lte: endOfMonth.toISOString().split("T")[0]
-          }
-        }
+            $lte: endOfMonth.toISOString().split("T")[0],
+          },
+          ...(roles === "Admin" ? {} : { userId }),
+        },
       },
       {
         $group: {
@@ -338,41 +469,42 @@ router.get("/attendance/status", auth, async (req, res) => {
           attendance: {
             $push: {
               date: "$date",
-              status: "$status"
-            }
-          }
-        }
+              status: "$status",
+            },
+          },
+        },
       },
       {
         $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'userInfo'
-        }
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "userInfo",
+        },
       },
-      {
-        $unwind: "$userInfo"
-      },
+      { $unwind: "$userInfo" },
       {
         $project: {
           userId: "$_id",
           name: "$userInfo.name",
-          attendance: 1
-        }
-      }
+          attendance: 1,
+        },
+      },
     ]);
 
-    const formattedRecords = allUsers.map(user => {
+    // Format the attendance data
+    const formattedRecords = users.map((user) => {
       const attendance = {};
+      // Initialize all days as "Absent"
       for (let day = 1; day <= endOfMonth.getDate(); day++) {
-        const dayString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
         attendance[dayString] = "Absent";
       }
 
-      const userRecord = attendanceRecords.find(record => record.userId.equals(user._id));
+      // Populate attendance records
+      const userRecord = attendanceRecords.find((record) => String(record.userId) === String(user._id));
       if (userRecord) {
-        userRecord.attendance.forEach(day => {
+        userRecord.attendance.forEach((day) => {
           attendance[day.date] = day.status || "Absent";
         });
       }
@@ -380,16 +512,26 @@ router.get("/attendance/status", auth, async (req, res) => {
       return {
         userId: user._id,
         name: user.name,
-        attendance
+        attendance,
       };
     });
 
-    res.status(200).json({ attendanceStatus: formattedRecords });
+    // Build the response
+    res.status(200).json({
+      message: "Attendance status fetched successfully",
+      totalRecords: totalUsers,
+      totalPages: page && limit ? Math.ceil(totalUsers / parseInt(limit)) : 1,
+      currentPage: page ? parseInt(page) : 1,
+      attendanceStatus: formattedRecords,
+    });
   } catch (error) {
-    console.error("Error fetching attendance records:", error);
+    console.error("Error fetching attendance records:", error.message);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });
+
+
+
 module.exports = router;
 
 

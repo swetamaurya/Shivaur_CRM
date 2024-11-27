@@ -15,6 +15,8 @@ async function getNextSequenceValue(type) {
     Employee: 'EMP',
     Supervisor: 'SPV',
     Client: 'CLT',
+    HR : "HR",
+    Manager:"MMG"
   
   };
 
@@ -57,8 +59,8 @@ const userSchema = new mongoose.Schema({
   gender: { type: String },
   status: { type: String, default: 'Pending' },
   joiningDate: { type: String },
-  departments: { type: String },
-  designations: { type: String },
+  departments: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
+  designations: { type: mongoose.Schema.Types.ObjectId, ref: 'Designation' },
   contactName: { type: String },
   contactEmail: { type: String },
   contactMobile: { type: String },
@@ -66,7 +68,8 @@ const userSchema = new mongoose.Schema({
   payslip: { type: String },
   leave:[{ type: mongoose.Schema.Types.ObjectId, ref: 'Leaves' }],
   attendance:[{ type: mongoose.Schema.Types.ObjectId, ref: 'Attendance' }],
-  // Primary Contact Information
+  Manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Manager field
+  Supervisor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Supe
   primaryContact: {
     name: { type: String },
     relationship: { type: String },
@@ -92,6 +95,9 @@ const userSchema = new mongoose.Schema({
     accountType: { type: String, enum: ['Savings', 'Current'] },
     PANNumber: { type: String }
   },
+resignation :  { type: mongoose.Schema.Types.ObjectId, ref: 'Resignation' }, 
+termination :  { type: mongoose.Schema.Types.ObjectId, ref: 'Termination' }, 
+
 
   currentOtp: { type: Number },
   createdAt: { type: Date, default: Date.now },

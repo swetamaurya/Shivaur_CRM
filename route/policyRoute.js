@@ -6,37 +6,74 @@ const { uploadFileToFirebase } = require('../utils/fireBase');
 const { auth } = require('../Middleware/authorization');
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Get all policies that the user is authorized to view
 router.get('/all', auth, async (req, res) => {
-  const { roles, id } = req.user;
-
   try {
-    // Adjust query to fetch policies based on user role or ownership
-    const query = roles === 'Admin' ? {} : { userId: id }; // Admins can view all, others only their own policies
+    const { roles, id } = req.user; // Extract user roles and ID
+    const { page, limit } = req.query;
 
-    const policies = await Policy.find(query).populate('department').sort({ createdAt: -1 });
-    res.status(200).json(policies);
+    // Define query logic: roles with full access (Admin, Manager, HR, Employee)
+    const rolesWithFullAccess = ['Admin', 'Manager', 'HR', 'Employee'];
+
+    const query = rolesWithFullAccess.includes(roles) ? {} : { userId: id };
+
+    if (!page || !limit) {
+      // Fetch all policies without pagination
+      const policies = await Policy.find(query)
+        .populate('department', 'departments') // Populate department details
+        // .populate('userId', 'name email') // Populate user details
+        .sort({ createdAt: -1 }); // Sort by creation date (descending)
+
+      return res.status(200).json({
+        data: policies,
+        totalPolicies: policies.length,
+        pagination: false,
+      });
+    }
+
+    // Apply pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const policies = await Policy.find(query)
+      .populate('department', 'departments') // Populate department details
+      // .populate('userId', 'name email') // Populate user details
+      .sort({ createdAt: -1 }) // Sort by creation date (descending)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalPolicies = await Policy.countDocuments(query);
+
+    res.status(200).json({
+      data: policies,
+      totalPolicies,
+      totalPages: Math.ceil(totalPolicies / limit),
+      currentPage: parseInt(page),
+      perPage: parseInt(limit),
+      pagination: true,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch policies' });
+    console.error("Error fetching policies:", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
+
 
 // Get a specific policy by ID with authorization check
 router.get('/:id', auth, async (req, res) => {
   const { roles, id: userId } = req.user;
 
   try {
-    const policy = await Policy.findById(req.params.id).populate('department');
+    const policy = await Policy.findById(req.params.id).populate('department','departments');
 
     if (!policy) {
       return res.status(404).json({ error: 'Policy not found' });
     }
 
-    // Check if the user is authorized to view this policy
-    if (roles !== 'Admin' && policy.userId.toString() !== userId) {
-      return res.status(403).json({ error: 'Unauthorized access to this policy' });
-    }
+    // // Check if the user is authorized to view this policy
+    // if (roles !== 'Admin' && policy.userId.toString() !== userId) {
+    //   return res.status(403).json({ error: 'Unauthorized access to this policy' });
+    // }
 
     res.status(200).json(policy);
   } catch (error) {

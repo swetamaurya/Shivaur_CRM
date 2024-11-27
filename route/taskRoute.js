@@ -9,56 +9,60 @@ const { Project } = require("../model/projectModel");
 // const { Project } = require("../model/projectModel");
 const upload = multer({ storage: multer.memoryStorage() });
  
-// Create a new task
-// route.post("/create", auth, async (req, res) => {
-//   try {
- 
-//     const newTask = new Task(req.body);
-
-//     await newTask.save();
-//     return res.status(201).json(newTask);
-//   } catch (error) {
-//     console.error("Error creating task:", error);
-//     return res.status(500).send(`Internal server error: ${error.message}`);
-//   }
-// });
-
-
-// Fetch all tasks - Only assigned tasks for non-admins
-route.get("/get", auth, async (req, res) => {
+route.get('/get', auth, async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const { roles, id } = req.user;
+    const { page, limit } = req.query;
 
-    const { roles, id } = req.user; // Extract user role and ID
+    // Roles with full access
+    const fullAccessRoles = ['Admin', 'Manager', 'HR'];
 
-    let query = {};
-    if (roles !== "Admin") {
-      // If the user is not an admin, only fetch tasks assigned to them
-      query.assignedTo = id;
+    // Query based on roles
+    const query = fullAccessRoles.includes(roles) ? {} : { assignedTo: id };
+
+    if (!page || !limit) {
+      const tasks = await Task.find(query)
+        .populate('project', 'projectName projectId')
+        .populate('assignedBy', 'name email userId')
+        .populate({ path: 'assignedTo', select: 'name email userId' })
+        .sort({ _id: -1 })
+        .exec();
+
+      return res.status(200).json({
+        data: tasks,
+        totalTasks: tasks.length,
+        pagination: false,
+      });
     }
 
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
     const tasks = await Task.find(query)
-      .populate("assignedTo", "name email userId")
-      .populate("project", "projectName projectId")
-      .populate("assignedBy", "name email userId")
+      .populate('project', 'projectName projectId')
+      .populate('assignedBy', 'name email userId')
+      .populate({ path: 'assignedTo', select: 'name email userId' })
       .sort({ _id: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .exec();
 
     const totalTasks = await Task.countDocuments(query);
 
     res.status(200).json({
-      tasks,
+      data: tasks,
+      totalTasks,
       totalPages: Math.ceil(totalTasks / limit),
       currentPage: parseInt(page),
-      totalTasks,
+      perPage: parseInt(limit),
+      pagination: true,
     });
   } catch (error) {
-    console.error("Error fetching tasks:", error);
-    return res.status(500).send(`Internal server error: ${error.message}`);
+    console.error('Error fetching tasks:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+
 
 // Get a single task by ID - Only assigned tasks for non-admins
 route.get("/get/:_id", auth, async (req, res) => {
@@ -68,18 +72,16 @@ route.get("/get/:_id", auth, async (req, res) => {
 
     // Find the task by ID
     const task = await Task.findById(_id)
-      .populate("assignedTo", "name email userId")
-      .populate("project", "projectName projectId")
-      .populate("assignedBy", "name email userId");
-
+    .populate("project", "projectName projectId")
+    .populate("assignedBy", "name email userId")
+    .populate({ path: 'assignedTo', select: 'name email userId' }) // Populate assignedTo with required fields
+     
+    .sort({ _id: -1 }).exec();
     if (!task) {
       return res.status(404).send("Task not found");
     }
 
-    // Check if the user has permission to view this task
-    if (roles !== "Admin" && (!task.assignedTo || task.assignedTo._id.toString() !== id.toString())) {
-      return res.status(403).send("Access denied: You are not authorized to view this task.");
-    }
+     
 
     res.status(200).json(task);
   } catch (error) {

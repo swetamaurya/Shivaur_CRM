@@ -18,16 +18,44 @@ router.post('/departments/post', auth, async (req, res) => {
   }
 });
 
-// Fetch all departments
 router.get('/departments/get', auth, async (req, res) => {
   try {
-    const departments = await Department.find().sort({ _id: -1 }); // Sort by creation date descending
-    res.status(200).json(departments);
+    const { page, limit } = req.query; // Extract pagination parameters
+
+    if (!page || !limit) {
+      // If pagination parameters are not provided, return all data
+      const departments = await Department.find().sort({ _id: -1 }); // Sort by creation date descending
+      return res.status(200).json({
+        data: departments,
+        totalDepartments: departments.length, // Total count of all departments
+        pagination: false, // Indicate that pagination is not applied
+      });
+    }
+
+    // If pagination parameters are provided, return paginated data
+    const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+
+    const departments = await Department.find()
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalDepartments = await Department.countDocuments(); // Total count of all departments
+
+    res.status(200).json({
+      data: departments,
+      totalDepartments,
+      totalPages: Math.ceil(totalDepartments / limit), // Calculate total pages
+      currentPage: parseInt(page), // Current page
+      perPage: parseInt(limit), // Items per page
+      pagination: true, // Indicate that pagination is applied
+    });
   } catch (error) {
     console.error("Error fetching departments:", error.message);
     res.status(500).json({ error: 'Error fetching departments' });
   }
 });
+
 
 // Update a department
 router.post('/departments/update', auth, async (req, res) => {
@@ -81,16 +109,46 @@ router.post('/designations/post', auth, async (req, res) => {
 // Fetch all designations with department details
 router.get('/designations/get', auth, async (req, res) => {
   try {
+    const { page, limit } = req.query; // Extract pagination parameters
+
+    if (!page || !limit) {
+      // If pagination parameters are not provided, return all data
+      const designations = await Designation.find()
+        .populate('departments', 'departments') // Only select 'departments' field
+        .sort({ _id: -1 });
+
+      return res.status(200).json({
+        data: designations,
+        totalDesignations: designations.length, // Total count of all designations
+        pagination: false, // Indicate that pagination is not applied
+      });
+    }
+
+    // If pagination parameters are provided, return paginated data
+    const skip = (parseInt(page) - 1) * parseInt(limit); // Calculate documents to skip
+
     const designations = await Designation.find()
       .populate('departments', 'departments') // Only select 'departments' field
-      .sort({ _id: -1 });
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
-    res.status(200).json(designations);
+    const totalDesignations = await Designation.countDocuments(); // Total count of all designations
+
+    res.status(200).json({
+      data: designations,
+      totalDesignations,
+      totalPages: Math.ceil(totalDesignations / limit), // Calculate total pages
+      currentPage: parseInt(page), // Current page
+      perPage: parseInt(limit), // Items per page
+      pagination: true, // Indicate that pagination is applied
+    });
   } catch (error) {
     console.error("Error fetching designations:", error.message);
     res.status(500).json({ error: 'Error fetching designations' });
   }
 });
+
 
 // Update a designation
 router.post('/designations/update', auth, async (req, res) => {

@@ -10,39 +10,64 @@ const { logger } = require("../utils/logger");
 const route = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// GET all products with pagination and roles
 route.get('/get', auth, async (req, res) => {
   try {
     const { roles } = req.user;
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const { page, limit } = req.query;
+
+    // Roles with full access
+    const fullAccessRoles = ['Admin', 'Manager', 'HR'];
+
+    // Check if the user's role is authorized
+    if (!fullAccessRoles.includes(roles)) {
+      return res.status(403).json({ message: "Unauthorized access for this role." });
+    }
 
     let products;
     let totalProducts;
 
-    if (roles === 'Admin') {
+    if (!page || !limit) {
+      // Fetch all products without pagination
       products = await Product.find()
-      .populate("category", "category")
-        .sort({ _id: -1 })
-        .skip(skip)
-        .limit(parseInt(limit));
+        .populate("category", "category")
+        .sort({ _id: -1 });
 
-      totalProducts = await Product.countDocuments();
-    } else {
-      res.status(403).json({ message: "Unauthorized access for this role." });
+      totalProducts = products.length;
+
+      return res.status(200).json({
+        data: products,
+        totalProducts,
+        pagination: false,
+      });
     }
 
+    // Apply pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    products = await Product.find()
+      .populate("category", "category")
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    totalProducts = await Product.countDocuments();
+
+    // Return paginated data
     res.status(200).json({
-      products,
+      data: products,
+      totalProducts,
       totalPages: Math.ceil(totalProducts / limit),
       currentPage: parseInt(page),
-      totalProducts,
+      perPage: parseInt(limit),
+      pagination: true,
     });
   } catch (error) {
     console.error(`Error fetching products: ${error.message}`);
-    res.status(500).send(`Internal server error: ${error.message}`);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
 
 
 // GET a single product by ID
@@ -51,7 +76,7 @@ route.get('/get/:_id', auth, async (req, res) => {
     const { _id } = req.params;
 
     const product = await Product.findById(_id)
-    .populate("category", "category");
+    .populate("category","category");
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
@@ -225,19 +250,43 @@ route.post("/categories/post", auth, async (req, res) => {
 
 route.get('/categories/get', auth, async (req, res) => {
   try {
- 
-    const category = await Category.find().sort({ _id: -1 })
+    const { page, limit } = req.query;
 
-    if (!category) {
-      return res.status(404).json({ message: 'Category not found' });
+    if (!page || !limit) {
+      const categories = await Category.find({}, "category") 
+        .sort({ _id: -1 });
+
+      return res.status(200).json({
+         categories,
+        totalCategories: categories.length,
+        pagination: false,
+      });
     }
 
-    res.status(200).json(category);
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const categories = await Category.find()
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalCategories = await Category.countDocuments();
+
+    res.status(200).json({
+      categories,
+      totalCategories,
+      totalPages: Math.ceil(totalCategories / limit),
+      currentPage: parseInt(page),
+      perPage: parseInt(limit),
+      pagination: true,
+    });
   } catch (error) {
-    logger.error(`Error fetching category: ${error.message}`);
-    res.status(500).send(`Internal server error: ${error.message}`);
+    console.error("Error fetching categories:", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
 
 
 route.post("/categories/update", auth, async (req, res) => {

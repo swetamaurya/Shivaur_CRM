@@ -46,27 +46,18 @@ const projectSchema = new mongoose.Schema({
   startDate: { type: String },
   tasks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Task' }],  totalTasks: Number,
 
-  // Automatically track when the document is created or updated
-  createdAt: { type: Date, default: Date.now },
+   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
-
-  // History field to track changes
-  history: [
-    {
-      field: String,  
-      oldValue: mongoose.Schema.Types.Mixed,   
-      newValue: mongoose.Schema.Types.Mixed,  
-      changedAt: { type: Date, default: Date.now }   
-    }
-  ]
+ 
 });
 
 // Schema for Material Management
 const MaterialSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String  },
   description: { type: String },
-  quantity: { type: String, required: true },
-  price : { type: String, required: true },
+  quantity: { type: String  },
+  unit: { type: String  },
+  price : { type: String  },
   allocatedToProject: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },  
   createdAt: { type: Date, default: Date.now },
   updatedAt : { type: Date, default: Date.now }

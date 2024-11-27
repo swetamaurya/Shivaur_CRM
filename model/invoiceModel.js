@@ -33,8 +33,8 @@ const invoiceSchema = new mongoose.Schema({
     invoiceId: {
         type: String,
      },
-     client:String,
-     project:String,
+     client:{ type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+     project:{ type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
      email:String,
      tax:String,
      clientAddress:String,
@@ -56,9 +56,9 @@ const invoiceSchema = new mongoose.Schema({
 
 const estimatesSchema = new mongoose.Schema({
     estimatesId:String,
-     client:String,
+     client:{ type: mongoose.Schema.Types.ObjectId, ref: 'User' },
      estimateDate:String,
-     project:String,
+     project:{ type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
      email:String,
      taxType:String,
     expiryDate:String,
